@@ -1,0 +1,706 @@
+/*
+ * Bearsampp Module MariaDB - Gradle Build
+ *
+ * This is a 100% Gradle build configuration for the MariaDB module.
+ * It handles downloading, extracting, and packaging MariaDB releases.
+ *
+ * VERSION RESOLUTION STRATEGY (2-tier fallback):
+ *   1. Local releases.properties (primary source)
+ *   2. Remote modules-untouched mariadb.properties (automatic fallback)
+ *      URL: https://github.com/Bearsampp/modules-untouched/blob/main/modules/mariadb.properties
+ *
+ * DOCUMENTATION:
+ *   All build documentation is located in /.gradle-docs/
+ *   See /.gradle-docs/README.md for complete documentation index
+ *
+ * Usage:
+ *   gradle tasks                              - List all available tasks
+ *   gradle release -PbundleVersion=12.0.2     - Build release for specific version
+ *   gradle releaseAll                         - Build all versions
+ *   gradle clean                              - Clean build artifacts
+ *   gradle listVersions                       - List available versions
+ *   gradle showUrls                           - Show download URLs
+ *   gradle validate                           - Validate configuration
+ */
+
+plugins {
+    id 'base'
+}
+
+// ============================================================================
+// PROJECT CONFIGURATION
+// ============================================================================
+
+// Load build properties
+def buildProps = new Properties()
+file('build.properties').withInputStream { buildProps.load(it) }
+
+// Project information
+group = 'com.bearsampp.modules'
+version = buildProps.getProperty('bundle.release', '1.0.0')
+description = "Bearsampp Module - ${buildProps.getProperty('bundle.name', 'mariadb')}"
+
+// Define project paths
+ext {
+    projectBasedir = projectDir.absolutePath
+    
+    // Bundle properties from build.properties
+    bundleName = buildProps.getProperty('bundle.name', 'mariadb')
+    bundleRelease = buildProps.getProperty('bundle.release', '1.0.0')
+    bundleType = buildProps.getProperty('bundle.type', 'bins')
+    bundleFormat = buildProps.getProperty('bundle.format', '7z')
+    
+    // Build paths - with configurable base path
+    def buildPathFromProps = buildProps.getProperty('build.path', '').trim()
+    def buildPathFromEnv = System.getenv('BEARSAMPP_BUILD_PATH') ?: ''
+    def defaultBuildPath = file("${projectDir.parent}/bearsampp-build").absolutePath
+    
+    buildBasePath = buildPathFromProps ?: (buildPathFromEnv ?: defaultBuildPath)
+    
+    // Temporary build directories (shared structure like Ant/Bruno)
+    buildTmpPath = file("${buildBasePath}/tmp").absolutePath
+    bundleTmpDownloadPath = file("${buildTmpPath}/downloads/${bundleName}").absolutePath
+    bundleTmpExtractPath = file("${buildTmpPath}/extract/${bundleName}").absolutePath
+    bundleTmpPrepPath = file("${buildTmpPath}/bundles_prep/${bundleType}/${bundleName}").absolutePath
+    bundleTmpBuildPath = file("${buildTmpPath}/bundles_build/${bundleType}/${bundleName}").absolutePath
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+// Function to load releases from local and remote sources
+def loadReleases() {
+    def releases = [:]
+    
+    // Load local releases.properties
+    if (file('releases.properties').exists()) {
+        def localProps = new Properties()
+        file('releases.properties').withInputStream { localProps.load(it) }
+        localProps.each { key, value ->
+            releases[key.toString()] = value.toString()
+        }
+        println "  Loaded ${localProps.size()} versions from local releases.properties"
+    }
+    
+    // Load remote mariadb.properties from modules-untouched
+    try {
+        def remoteUrl = 'https://raw.githubusercontent.com/Bearsampp/modules-untouched/main/modules/mariadb.properties'
+        println "  Fetching mariadb.properties from modules-untouched..."
+        def remoteContent = new URL(remoteUrl).text
+        def remoteProps = new Properties()
+        remoteProps.load(new StringReader(remoteContent))
+        
+        def addedCount = 0
+        remoteProps.each { key, value ->
+            // Only add if not already in local releases
+            if (!releases.containsKey(key.toString())) {
+                releases[key.toString()] = value.toString()
+                addedCount++
+            }
+        }
+        println "  Added ${addedCount} versions from modules-untouched"
+    } catch (Exception e) {
+        println "  [WARN] Could not load remote mariadb.properties: ${e.message}"
+    }
+    
+    return releases
+}
+
+// Function to get available versions from releases with directory info
+def getAvailableVersions() {
+    def versions = []
+    def releases = loadReleases()
+    
+    // Check which versions have bin/ directories
+    releases.keySet().each { ver ->
+        def binDir = file("bin/mariadb${ver}")
+        def archivedDir = file("bin/archived/mariadb${ver}")
+        
+        if (binDir.exists()) {
+            versions << [version: ver, path: "bin/", fullPath: "bin/mariadb${ver}"]
+        } else if (archivedDir.exists()) {
+            versions << [version: ver, path: "bin/archived/", fullPath: "bin/archived/mariadb${ver}"]
+        } else {
+            versions << [version: ver, path: null, fullPath: null]
+        }
+    }
+    
+    return versions.sort { it.version }
+}
+
+// Function to download file from URL
+def downloadFile(String url, File destFile) {
+    println "  Downloading from: ${url}"
+    println "  Destination: ${destFile.absolutePath}"
+    
+    destFile.parentFile.mkdirs()
+    
+    if (destFile.exists()) {
+        println "  [CACHED] Using existing file"
+        return destFile
+    }
+    
+    try {
+        def connection = new URL(url).openConnection()
+        connection.setRequestProperty("User-Agent", "Bearsampp-Gradle-Build")
+        
+        destFile.withOutputStream { out ->
+            out << connection.inputStream
+        }
+        
+        println "  [OK] Download complete (${String.format('%.2f', destFile.length() / 1024 / 1024)} MB)"
+        return destFile
+    } catch (Exception e) {
+        throw new GradleException("Failed to download from ${url}: ${e.message}")
+    }
+}
+
+// Function to extract archive
+def extractArchive(File archiveFile, File destDir) {
+    println "  Extracting archive..."
+    println "  Archive: ${archiveFile.name}"
+    println "  Destination: ${destDir.absolutePath}"
+    
+    destDir.mkdirs()
+    
+    def filename = archiveFile.name.toLowerCase()
+    
+    if (filename.endsWith('.7z')) {
+        // Use 7zip for .7z files
+        def cmd = "7z x \"${archiveFile.absolutePath}\" -o\"${destDir.absolutePath}\" -y"
+        def process = cmd.execute()
+        process.waitFor()
+        
+        if (process.exitValue() != 0) {
+            throw new GradleException("7zip extraction failed with exit code: ${process.exitValue()}")
+        }
+    } else if (filename.endsWith('.zip')) {
+        // Use Gradle's built-in zip support
+        copy {
+            from zipTree(archiveFile)
+            into destDir
+        }
+    } else {
+        throw new GradleException("Unsupported archive format: ${filename}")
+    }
+    
+    println "  [OK] Extraction complete"
+}
+
+// Helper function to calculate hash
+def calculateHash(File file, String algorithm) {
+    def digest = java.security.MessageDigest.getInstance(algorithm)
+    file.withInputStream { stream ->
+        def buffer = new byte[8192]
+        def bytesRead
+        while ((bytesRead = stream.read(buffer)) != -1) {
+            digest.update(buffer, 0, bytesRead)
+        }
+    }
+    return digest.digest().collect { String.format('%02x', it) }.join('')
+}
+
+// Function to generate checksums (MD5, SHA1, SHA256, SHA512)
+def generateChecksums(File file) {
+    println "  Generating checksums..."
+    
+    if (!file.exists()) {
+        throw new GradleException("File not found for hashing: ${file}")
+    }
+    
+    // Generate MD5
+    def md5File = new File("${file.absolutePath}.md5")
+    def md5Hash = calculateHash(file, 'MD5')
+    md5File.text = "${md5Hash} ${file.name}\n"
+    println "  Created: ${md5File.name}"
+    
+    // Generate SHA1
+    def sha1File = new File("${file.absolutePath}.sha1")
+    def sha1Hash = calculateHash(file, 'SHA-1')
+    sha1File.text = "${sha1Hash} ${file.name}\n"
+    println "  Created: ${sha1File.name}"
+    
+    // Generate SHA256
+    def sha256File = new File("${file.absolutePath}.sha256")
+    def sha256Hash = calculateHash(file, 'SHA-256')
+    sha256File.text = "${sha256Hash} ${file.name}\n"
+    println "  Created: ${sha256File.name}"
+    
+    // Generate SHA512
+    def sha512File = new File("${file.absolutePath}.sha512")
+    def sha512Hash = calculateHash(file, 'SHA-512')
+    sha512File.text = "${sha512Hash} ${file.name}\n"
+    println "  Created: ${sha512File.name}"
+}
+
+// Function to process a single version
+def processVersion(versionInfo) {
+    // Handle both String and Map inputs
+    def version = (versionInfo instanceof String) ? versionInfo : versionInfo.version
+    
+    println ""
+    println "=" * 80
+    println "Processing MariaDB ${version}"
+    println "=" * 80
+    
+    try {
+        // Download and extract MariaDB from URL
+        println "  Source: Remote download"
+        def releases = loadReleases()
+        def downloadUrl = releases[version]
+        
+        if (!downloadUrl) {
+            println "  [FAIL] No download URL found for version ${version}"
+            return false
+        }
+        
+        // Download archive
+        def filename = downloadUrl.substring(downloadUrl.lastIndexOf('/') + 1)
+        def downloadedFile = file("${bundleTmpDownloadPath}/${filename}")
+        downloadFile(downloadUrl, downloadedFile)
+        
+        // Extract archive
+        def extractDir = file("${bundleTmpExtractPath}/${version}")
+        if (extractDir.exists()) {
+            delete extractDir
+        }
+        extractArchive(downloadedFile, extractDir)
+        
+        // Find the extracted MariaDB directory
+        def mariadbDir = null
+        extractDir.eachFile { f ->
+            if (f.isDirectory() && f.name.toLowerCase().contains('mariadb')) {
+                mariadbDir = f
+            }
+        }
+        
+        if (!mariadbDir) {
+            // If no mariadb directory found, use the extract dir itself
+            mariadbDir = extractDir
+        }
+        
+        // Create build directory (use simple naming like bruno2.9.1, mariadb12.0.2)
+        def buildDir = file("${bundleTmpBuildPath}/${bundleName}${version}")
+        if (buildDir.exists()) {
+            delete buildDir
+        }
+        buildDir.mkdirs()
+        
+        // Copy MariaDB files from extracted archive
+        println "  Copying MariaDB files from archive..."
+        copy {
+            from mariadbDir
+            into buildDir
+        }
+        
+        // Copy configuration files from bin/ directory if they exist
+        def binConfigDir = file("bin/mariadb${version}")
+        if (binConfigDir.exists()) {
+            println "  Copying configuration files from bin/mariadb${version}/..."
+            copy {
+                from binConfigDir
+                into buildDir
+            }
+        } else {
+            println "  [WARN] No configuration directory found at bin/mariadb${version}/"
+        }
+        
+        // Copy releases.properties
+        copy {
+            from 'releases.properties'
+            into buildDir
+        }
+        
+        // Process bearsampp.conf - replace @RELEASE_VERSION@ placeholder
+        def confFile = file("${buildDir}/bearsampp.conf")
+        if (confFile.exists()) {
+            def content = confFile.text
+            content = content.replace('@RELEASE_VERSION@', bundleRelease)
+            confFile.text = content
+            println "  [OK] Processed: bearsampp.conf"
+        } else {
+            println "  [WARN] bearsampp.conf not found"
+        }
+        
+        // Determine build output path following Bruno/Apache pattern
+        // bearsampp-build/bins/mariadb/{bundleRelease}
+        def buildPath = file(buildBasePath)
+        def buildBinsPath = file("${buildPath}/${bundleType}/${bundleName}/${bundleRelease}")
+        buildBinsPath.mkdirs()
+        
+        // Create archive in proper output directory
+        def outputFile = file("${buildBinsPath}/bearsampp-${bundleName}-${version}-${bundleRelease}.${bundleFormat}")
+        println "  Creating archive: ${outputFile.name}"
+        println "  Output directory: ${buildBinsPath.absolutePath}"
+        
+        if (bundleFormat == '7z') {
+            def cmd = "7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on \"${outputFile.absolutePath}\" \"${buildDir.name}\""
+            def process = cmd.execute(null, file(bundleTmpBuildPath))
+            process.waitFor()
+            
+            if (process.exitValue() != 0) {
+                throw new Exception("7zip failed with exit code: ${process.exitValue()}")
+            }
+        } else if (bundleFormat == 'zip') {
+            tasks.create(name: "zipTemp${version.replaceAll('[^a-zA-Z0-9]', '_')}", type: Zip) {
+                from buildDir
+                archiveFileName = outputFile.name
+                destinationDirectory = buildBinsPath
+            }.execute()
+        }
+        
+        if (outputFile.exists()) {
+            def sizeMB = String.format("%.2f", outputFile.length() / 1024 / 1024)
+            println "  [OK] Created: ${outputFile.name}"
+            println "  [OK] Size: ${sizeMB} MB"
+            println "  [OK] Location: ${outputFile.absolutePath}"
+            
+            // Generate checksums
+            generateChecksums(outputFile)
+            
+            // Note: Build directory is kept in bundleTmpBuildPath for reference
+            // It will be cleaned by the clean task
+            return true
+        } else {
+            println "  [FAIL] Archive file not created"
+            return false
+        }
+        
+    } catch (Exception e) {
+        println "  [FAIL] Error processing version ${version}: ${e.message}"
+        e.printStackTrace()
+        return false
+    }
+}
+
+// Interactive version selection
+def selectVersions() {
+    def versions = getAvailableVersions()
+    
+    if (versions.isEmpty()) {
+        println "No MariaDB versions found in releases"
+        return []
+    }
+    
+    println ""
+    println "Available MariaDB versions:"
+    println ""
+    
+    versions.eachWithIndex { ver, idx ->
+        if (ver.path) {
+            println "  ${idx + 1}. MariaDB ${ver.version} (${ver.path})"
+        } else {
+            println "  ${idx + 1}. MariaDB ${ver.version}"
+        }
+    }
+    
+    println ""
+    println "  0. All versions"
+    println ""
+    print "Select version(s) (comma-separated numbers, e.g., 1,3,5 or 0 for all): "
+    System.out.flush()
+    
+    // Read input using Gradle's standard input
+    def input = null
+    try {
+        def reader = new BufferedReader(new InputStreamReader(System.in))
+        input = reader.readLine()
+        
+        // Debug: show what was read
+        if (input != null) {
+            println "DEBUG: Read input: '${input}'"
+        } else {
+            println "DEBUG: Input was null"
+        }
+    } catch (Exception e) {
+        println "DEBUG: Exception reading input: ${e.message}"
+        throw new GradleException("""
+            Failed to read input. Please use non-interactive mode:
+              gradle release -PbundleVersion=X.X.X
+            
+            Or run with --no-daemon flag:
+              gradle --no-daemon release
+            
+            Available versions: ${versions.collect { it.version }.join(', ')}
+        """.stripIndent())
+    }
+    
+    if (input == null || input.trim().isEmpty()) {
+        println ""
+        println "No selection made. Exiting."
+        println ""
+        println "NOTE: If running in daemon mode, interactive input may not work."
+        println "Try running with: gradle --no-daemon release"
+        println "Or use: gradle release -PbundleVersion=X.X.X"
+        return []
+    }
+    
+    def selectedVersions = []
+    
+    if (input.trim() == '0') {
+        selectedVersions = versions as List
+    } else {
+        input.split(',').each { item ->
+            def trimmed = item.trim()
+            try {
+                // Try to parse as a number (list index)
+                def num = trimmed.toInteger()
+                if (num > 0 && num <= versions.size()) {
+                    selectedVersions << versions[num - 1]
+                }
+            } catch (NumberFormatException e) {
+                // Not a number, try to match as version string
+                def matchedVersion = versions.find { it.version == trimmed }
+                if (matchedVersion) {
+                    selectedVersions << matchedVersion
+                } else {
+                    println "  [WARN] Version '${trimmed}' not found in list"
+                }
+            }
+        }
+    }
+    
+    return selectedVersions
+}
+
+// ============================================================================
+// TASKS
+// ============================================================================
+
+// Configure clean task
+clean {
+    delete file(buildTmpPath)
+    doLast {
+        println "Cleaned temporary build directory: ${buildTmpPath}"
+    }
+}
+
+// List versions task
+task listVersions {
+    description = 'List all available MariaDB versions'
+    group = 'help'
+    
+    doLast {
+        println ""
+        println "Loading available MariaDB versions..."
+        def versions = getAvailableVersions()
+        
+        println ""
+        println "Available MariaDB versions:"
+        println ""
+        
+        versions.each { ver ->
+            if (ver.path) {
+                println "  - MariaDB ${ver.version} (${ver.path}/)"
+            } else {
+                println "  - MariaDB ${ver.version}"
+            }
+        }
+        
+        println ""
+        println "Total: ${versions.size()} version(s)"
+    }
+}
+
+// Show download URLs task
+task showUrls {
+    description = 'Show download URLs for all MariaDB versions'
+    group = 'help'
+    
+    doLast {
+        println ""
+        println "Loading release information..."
+        def releases = loadReleases()
+        
+        println ""
+        println "=" * 80
+        println "MariaDB Download URLs"
+        println "=" * 80
+        println ""
+        
+        def sortedVersions = releases.keySet().sort()
+        
+        sortedVersions.each { ver ->
+            def url = releases[ver]
+            println "  MariaDB ${ver}"
+            println "  ${url}"
+            println ""
+        }
+        
+        println "=" * 80
+        println "Total: ${releases.size()} version(s)"
+        println "=" * 80
+    }
+}
+
+// Release task - interactive version selection
+task release {
+    description = 'Build release for MariaDB version(s) with interactive selection'
+    group = 'build'
+    dependsOn clean
+    
+    doLast {
+        println ""
+        println "=" * 80
+        println "MariaDB Module Release Builder"
+        println "Release: ${bundleRelease}"
+        println "=" * 80
+        
+        // Check for command-line version parameter
+        def versionParam = project.findProperty('bundleVersion')
+        def selectedVersions = []
+        
+        if (versionParam) {
+            println ""
+            println "Building version: ${versionParam}"
+            // Just pass the version string directly
+            selectedVersions = [[version: versionParam]]
+        } else {
+            selectedVersions = selectVersions()
+        }
+        
+        if (selectedVersions.isEmpty()) {
+            println ""
+            println "No versions selected. Exiting."
+            return
+        }
+        
+        println ""
+        println "Selected ${selectedVersions.size()} version(s): ${selectedVersions.join(', ')}"
+        println ""
+        
+        def successCount = 0
+        def failCount = 0
+        
+        selectedVersions.each { ver ->
+            if (processVersion(ver)) {
+                successCount++
+            } else {
+                failCount++
+            }
+        }
+        
+        println ""
+        println "=" * 80
+        println "Release Summary"
+        println "=" * 80
+        println "  [OK] Successful: ${successCount}"
+        if (failCount > 0) {
+            println "  [FAIL] Failed: ${failCount}"
+        }
+        println "  Output directory: ${buildBasePath}"
+        println "=" * 80
+        println ""
+    }
+}
+
+// Release All task - builds all versions non-interactively
+task releaseAll {
+    description = 'Build all MariaDB versions (non-interactive)'
+    group = 'build'
+    dependsOn clean
+    
+    doLast {
+        def versions = getAvailableVersions()
+        
+        if (versions.isEmpty()) {
+            println "No MariaDB versions found in releases"
+            return
+        }
+        
+        println ""
+        println "=" * 80
+        println "MariaDB Module Build All Versions"
+        println "Release: ${bundleRelease}"
+        println "=" * 80
+        println ""
+        println "Building ${versions.size()} version(s): ${versions.join(', ')}"
+        println ""
+        
+        def successCount = 0
+        def failCount = 0
+        
+        versions.each { ver ->
+            if (processVersion(ver)) {
+                successCount++
+            } else {
+                failCount++
+            }
+        }
+        
+        println ""
+        println "=" * 80
+        println "Build Summary"
+        println "=" * 80
+        println "  [OK] Successful: ${successCount}"
+        if (failCount > 0) {
+            println "  [FAIL] Failed: ${failCount}"
+        }
+        println "  Output directory: ${buildBasePath}"
+        println "=" * 80
+        println ""
+    }
+}
+
+// Validate task
+task validate {
+    description = 'Validate build configuration'
+    group = 'verification'
+    
+    doLast {
+        println ""
+        println "Validating MariaDB module configuration..."
+        println ""
+        
+        def valid = true
+        
+        // Check build.properties
+        if (!file('build.properties').exists()) {
+            println "  [FAIL] build.properties not found"
+            valid = false
+        } else {
+            println "  [OK] build.properties found"
+        }
+        
+        // Check releases.properties
+        if (!file('releases.properties').exists()) {
+            println "  [WARN] releases.properties not found (will use remote only)"
+        } else {
+            println "  [OK] releases.properties found"
+        }
+        
+        // Check if we can load versions
+        try {
+            def versions = getAvailableVersions()
+            if (versions.isEmpty()) {
+                println "  [FAIL] No versions found"
+                valid = false
+            } else {
+                println "  [OK] Found ${versions.size()} version(s)"
+            }
+        } catch (Exception e) {
+            println "  [FAIL] Error loading versions: ${e.message}"
+            valid = false
+        }
+        
+        // Check 7zip availability
+        try {
+            def process = "7z".execute()
+            process.waitFor()
+            println "  [OK] 7-Zip is available"
+        } catch (Exception e) {
+            println "  [WARN] 7-Zip not found in PATH (required for .7z format)"
+        }
+        
+        println ""
+        if (valid) {
+            println "[OK] Configuration is valid"
+        } else {
+            throw new GradleException("Configuration validation failed")
+        }
+    }
+}
+
+// Set default task
+defaultTasks 'listVersions'

@@ -1,0 +1,183 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, gradle-convert ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Module
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+      
+      - name: Setup 7-Zip
+        run: |
+          choco install 7zip -y
+          echo "C:\Program Files\7-Zip" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v2
+      
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+        shell: bash
+      
+      - name: Validate configuration
+        run: ./gradlew validate --no-daemon --stacktrace
+      
+      - name: List MariaDB versions
+        run: ./gradlew listVersions --no-daemon
+      
+      - name: Build module
+        run: ./gradlew build --no-daemon --stacktrace
+        env:
+          BEARSAMPP_BUILD_PATH: ${{ github.workspace }}/build-output
+      
+      - name: Check build output
+        run: |
+          if (Test-Path "build-output/bearsampp-mariadb-*.7z") {
+            Write-Host "✓ Build artifact created successfully"
+            Get-ChildItem "build-output/bearsampp-mariadb-*.7z" | ForEach-Object {
+              $sizeMB = [math]::Round($_.Length / 1MB, 2)
+              Write-Host "  File: $($_.Name)"
+              Write-Host "  Size: $sizeMB MB"
+            }
+          } else {
+            Write-Host "✗ Build artifact not found"
+            exit 1
+          }
+        shell: pwsh
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bearsampp-mariadb-module
+          path: build-output/bearsampp-mariadb-*.7z
+          retention-days: 30
+      
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build/
+            .gradle/
+          retention-days: 7
+
+  validate:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check documentation files
+        run: |
+          echo "Checking documentation files..."
+          
+          # Check main docs
+          test -f README.md || { echo "✗ README.md missing"; exit 1; }
+          test -f CHANGELOG.md || { echo "✗ CHANGELOG.md missing"; exit 1; }
+          test -f LICENSE || { echo "✗ LICENSE missing"; exit 1; }
+          
+          # Check Gradle docs
+          test -f .gradle-docs/README.md || { echo "✗ .gradle-docs/README.md missing"; exit 1; }
+          test -f .gradle-docs/TASKS.md || { echo "✗ .gradle-docs/TASKS.md missing"; exit 1; }
+          test -f .gradle-docs/CONFIGURATION.md || { echo "✗ .gradle-docs/CONFIGURATION.md missing"; exit 1; }
+          test -f .gradle-docs/MIGRATION.md || { echo "✗ .gradle-docs/MIGRATION.md missing"; exit 1; }
+          
+          echo "✓ All documentation files present"
+      
+      - name: Check build files
+        run: |
+          echo "Checking build files..."
+          
+          test -f build.gradle.kts || { echo "✗ build.gradle.kts missing"; exit 1; }
+          test -f settings.gradle.kts || { echo "✗ settings.gradle.kts missing"; exit 1; }
+          test -f build.properties || { echo "✗ build.properties missing"; exit 1; }
+          test -f releases.properties || { echo "✗ releases.properties missing"; exit 1; }
+          test -f gradlew || { echo "✗ gradlew missing"; exit 1; }
+          test -f gradlew.bat || { echo "✗ gradlew.bat missing"; exit 1; }
+          test -f gradle/wrapper/gradle-wrapper.properties || { echo "✗ gradle-wrapper.properties missing"; exit 1; }
+          
+          echo "✓ All build files present"
+      
+      - name: Check for Ant files
+        run: |
+          echo "Checking for old Ant files..."
+          
+          if test -f build.xml; then
+            echo "✗ build.xml should be removed"
+            exit 1
+          fi
+          
+          if test -f build-commons.xml; then
+            echo "✗ build-commons.xml should be removed"
+            exit 1
+          fi
+          
+          if test -f build-properties.xml; then
+            echo "✗ build-properties.xml should be removed"
+            exit 1
+          fi
+          
+          echo "✓ No Ant files found (good)"
+      
+      - name: Validate Markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          config-file: '.github/markdown-link-check-config.json'
+        continue-on-error: true
+
+  release:
+    name: Create Release
+    runs-on: windows-latest
+    needs: [build, validate]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+      
+      - name: Setup 7-Zip
+        run: |
+          choco install 7zip -y
+          echo "C:\Program Files\7-Zip" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      
+      - name: Build release
+        run: ./gradlew clean build --no-daemon
+        env:
+          BEARSAMPP_BUILD_PATH: ${{ github.workspace }}/release-output
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-output/bearsampp-mariadb-*.7z
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
