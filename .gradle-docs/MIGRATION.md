@@ -1,5 +1,14 @@
 # Ant to Gradle Migration Guide
 
+> Important note about the current build (2025-11-14):
+>
+> - The module now uses a Groovy `build.gradle` (not Kotlin DSL).
+> - MariaDB versions are sourced from the modules-untouched repository (`mariadb.properties`) with a standard URL fallback.
+> - Core tasks provided by this build are: `info`, `release` (supports `-PbundleVersion` and interactive selection), `releaseAll`, `clean`, `verify`, `listReleases`, `listVersions`, `validateProperties`, and `checkModulesUntouched`.
+> - Local `releases.properties` is considered legacy and is not used by the Gradle build.
+>
+> Sections below that mention Kotlin DSL, `init`, `bundle`, or template replacement of `bearsampp.conf` describe earlier approaches and are preserved for historical context. Refer to the note above and to `.gradle-docs/README.md` and `TASKS.md` for the current behavior.
+
 This document explains the migration from Apache Ant to Gradle build system for the MariaDB module.
 
 ## Table of Contents

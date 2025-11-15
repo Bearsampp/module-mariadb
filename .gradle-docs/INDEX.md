@@ -7,26 +7,23 @@ Complete index of all Gradle build documentation for the MariaDB module.
 | Document                                      | Purpose                                    |
 |-----------------------------------------------|--------------------------------------------|
 | [Quick Reference](QUICK-REFERENCE.md)         | Command cheat sheet - **Start here!**      |
-| [Usage Guide](USAGE.md)                       | Detailed usage examples                    |
 | [Main Guide](README.md)                       | Complete build system guide                |
 | [Task Reference](TASKS.md)                    | Detailed task documentation                |
 | [Configuration Guide](CONFIGURATION.md)       | Configuration options and properties       |
 | [Migration Guide](MIGRATION.md)               | Ant to Gradle migration                    |
 | [Summary](SUMMARY.md)                         | Conversion summary and statistics          |
-| [Conversion Summary](CONVERSION-SUMMARY.md)   | Groovy DSL conversion details              |
-| [Conversion Complete](CONVERSION-COMPLETE.md) | Final conversion status                    |
 
 ## Documentation Structure
 
 ```
 .gradle-docs/
 ├── INDEX.md                    # This file - documentation index
-├── QUICK-REFERENCE.md          # Quick command reference (200 lines)
-├── README.md                   # Main documentation (650 lines)
-├── TASKS.md                    # Task reference (850 lines)
-├── CONFIGURATION.md            # Configuration guide (900 lines)
-├── MIGRATION.md                # Migration guide (750 lines)
-└── SUMMARY.md                  # Conversion summary (400 lines)
+├── QUICK-REFERENCE.md          # Quick command reference
+├── README.md                   # Main documentation
+├── TASKS.md                    # Task reference
+├── CONFIGURATION.md            # Configuration guide
+├── MIGRATION.md                # Migration guide
+└── SUMMARY.md                  # Conversion summary
 ```
 
 ## By Topic
@@ -38,20 +35,24 @@ Complete index of all Gradle build documentation for the MariaDB module.
 
 ### Building
 - [README.md § Building the Module](README.md#building-the-module) - Build guide
-- [TASKS.md § Core Build Tasks](TASKS.md#core-build-tasks) - Build tasks
-- [QUICK-REFERENCE.md § Build Tasks](QUICK-REFERENCE.md#build-tasks) - Quick commands
+- [TASKS.md § Tasks](TASKS.md#tasks) - Build tasks
+- [QUICK-REFERENCE.md § Tasks](QUICK-REFERENCE.md#tasks) - Quick commands
 
 ### Configuration
 - [CONFIGURATION.md](CONFIGURATION.md) - Complete configuration guide
 - [CONFIGURATION.md § Build Properties](CONFIGURATION.md#build-properties) - build.properties
-- [CONFIGURATION.md § Configuration Files](CONFIGURATION.md#configuration-files) - bearsampp.conf
+- [CONFIGURATION.md § Configuration Files](CONFIGURATION.md#configuration-files) - copying/overlays
 - [QUICK-REFERENCE.md § Configuration Files](QUICK-REFERENCE.md#configuration-files) - Quick reference
 
 ### Tasks
 - [TASKS.md](TASKS.md) - Complete task reference
-- [TASKS.md § Core Build Tasks](TASKS.md#core-build-tasks) - Main tasks
-- [TASKS.md § Utility Tasks](TASKS.md#utility-tasks) - Helper tasks
-- [QUICK-REFERENCE.md § Build Tasks](QUICK-REFERENCE.md#build-tasks) - Quick list
+- [TASKS.md § release](TASKS.md#release) - Build one version
+- [TASKS.md § releaseAll](TASKS.md#releaseall) - Prep all versions
+- [TASKS.md § verify](TASKS.md#verify) - Environment checks
+- [TASKS.md § listReleases](TASKS.md#listreleases) - Remote versions
+- [TASKS.md § listVersions](TASKS.md#listversions) - Local versions
+- [TASKS.md § validateProperties](TASKS.md#validateproperties) - Validate build.properties
+- [TASKS.md § checkModulesUntouched](TASKS.md#checkmodulesuntouched) - Integration check
 
 ### Migration
 - [MIGRATION.md](MIGRATION.md) - Complete migration guide
@@ -100,15 +101,17 @@ Complete index of all Gradle build documentation for the MariaDB module.
 ## By Task
 
 ### Build Tasks
-- [TASKS.md § clean](TASKS.md#clean) - Remove build directory
-- [TASKS.md § init](TASKS.md#init) - Initialize build
-- [TASKS.md § release](TASKS.md#release) - Process configs
-- [TASKS.md § bundle](TASKS.md#bundle) - Create archive
-- [TASKS.md § build](TASKS.md#build) - Complete build
+- [TASKS.md § info](TASKS.md#info) - Show build info
+- [TASKS.md § release](TASKS.md#release) - Build one version
+- [TASKS.md § releaseAll](TASKS.md#releaseall) - Prep all versions
+- [TASKS.md § clean](TASKS.md#clean) - Clean Gradle build dir
 
-### Utility Tasks
-- [TASKS.md § validate](TASKS.md#validate) - Validate configs
-- [TASKS.md § listVersions](TASKS.md#listversions) - List versions
+### Utility/Verification
+- [TASKS.md § verify](TASKS.md#verify) - Verify environment
+- [TASKS.md § listReleases](TASKS.md#listreleases) - Remote releases
+- [TASKS.md § listVersions](TASKS.md#listversions) - Local versions
+- [TASKS.md § validateProperties](TASKS.md#validateproperties) - Validate build.properties
+- [TASKS.md § checkModulesUntouched](TASKS.md#checkmodulesuntouched) - Integration check
 
 ## By Configuration
 

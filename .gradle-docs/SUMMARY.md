@@ -4,40 +4,33 @@ This document summarizes the conversion of the MariaDB module from Apache Ant to
 
 ## Overview
 
-The MariaDB module has been successfully converted to use a pure Gradle build system with Kotlin DSL, following the patterns established in other Bearsampp modules (bruno, git, apache).
+The MariaDB module has been converted to use a pure Gradle build system with Groovy DSL (`build.gradle`). The build sources MariaDB versions from the modules-untouched repository and packages releases into a shared `bearsampp-build` structure.
 
 ## Files Created
 
 ### Build System Files
 
-| File                                      | Purpose                                    | Lines |
-|-------------------------------------------|--------------------------------------------|-------|
-| `build.gradle.kts`                        | Main Gradle build script (Kotlin DSL)      | ~180  |
-| `settings.gradle.kts`                     | Gradle project settings                    | ~1    |
-| `gradlew`                                 | Gradle wrapper script (Unix/Linux/Mac)     | ~240  |
-| `gradlew.bat`                             | Gradle wrapper script (Windows)            | ~90   |
-| `gradle/wrapper/gradle-wrapper.properties`| Gradle wrapper configuration               | ~7    |
-| `gradle/wrapper/gradle-wrapper.jar`       | Gradle wrapper JAR (binary)                | N/A   |
-| `.gitignore`                              | Git ignore rules (updated)                 | ~30   |
+| File               | Purpose                           |
+|--------------------|-----------------------------------|
+| `build.gradle`     | Main Gradle build script (Groovy) |
+| `settings.gradle`  | Gradle project settings           |
+| `.gitignore`       | Git ignore rules (updated)        |
 
 ### Documentation Files
 
-| File                              | Purpose                                    | Lines |
-|-----------------------------------|--------------------------------------------|-------|
-| `.gradle-docs/README.md`          | Main Gradle build documentation            | ~650  |
-| `.gradle-docs/TASKS.md`           | Detailed task reference                    | ~850  |
-| `.gradle-docs/CONFIGURATION.md`   | Configuration guide                        | ~900  |
-| `.gradle-docs/MIGRATION.md`       | Ant to Gradle migration guide              | ~750  |
-| `.gradle-docs/SUMMARY.md`         | This file - conversion summary             | ~200  |
-| `CHANGELOG.md`                    | Project changelog                          | ~150  |
-| `CONTRIBUTING.md`                 | Contribution guidelines                    | ~600  |
+| File                            | Purpose                         |
+|---------------------------------|---------------------------------|
+| `.gradle-docs/README.md`        | Main Gradle build documentation |
+| `.gradle-docs/TASKS.md`         | Detailed task reference         |
+| `.gradle-docs/CONFIGURATION.md` | Configuration guide             |
+| `.gradle-docs/MIGRATION.md`     | Ant to Gradle migration guide   |
+| `.gradle-docs/SUMMARY.md`       | This file - conversion summary  |
+| `CHANGELOG.md`                  | Project changelog               |
+| `CONTRIBUTING.md`               | Contribution guidelines         |
 
 ### CI/CD Files
 
-| File                                          | Purpose                            | Lines |
-|-----------------------------------------------|------------------------------------|-------|
-| `.github/workflows/build.yml`                 | GitHub Actions build workflow      | ~150  |
-| `.github/markdown-link-check-config.json`     | Markdown link checker config       | ~15   |
+If present, GitHub Actions and related CI files may be configured separately from this module.
 
 ### Utility Files
 
@@ -53,23 +46,23 @@ The MariaDB module has been successfully converted to use a pure Gradle build sy
 
 ### Preserved Files
 
-| File                   | Status                                    |
-|------------------------|-------------------------------------------|
-| `build.properties`     | Unchanged - still used by Gradle          |
-| `releases.properties`  | Unchanged - still used by Gradle          |
-| `bin/*/bearsampp.conf` | Unchanged - format remains the same       |
-| `LICENSE`              | Unchanged                                 |
-| `.editorconfig`        | Unchanged                                 |
+| File                   | Status                                      |
+|------------------------|---------------------------------------------|
+| `build.properties`     | Used by Gradle (bundle metadata, paths)     |
+| `releases.properties`  | Legacy (not used by current Gradle build)   |
+| `bin/*/*`              | Optional local version sources and overlays |
+| `LICENSE`              | Unchanged                                   |
+| `.editorconfig`        | Unchanged                                   |
 
 ## Files Removed
 
 ### Ant Build Files (To Be Removed)
 
-| File                   | Reason                                    |
-|------------------------|-------------------------------------------|
-| `build.xml`            | Replaced by `build.gradle.kts`            |
-| `build-commons.xml`    | Functionality built into Gradle           |
-| `build-properties.xml` | Native Gradle property support            |
+| File                   | Reason                          |
+|------------------------|---------------------------------|
+| `build.xml`            | Replaced by `build.gradle`      |
+| `build-commons.xml`    | Built-in via Gradle tasks       |
+| `build-properties.xml` | Native Gradle property support  |
 
 **Note**: These files should be removed if they exist in the repository.
 
@@ -77,35 +70,31 @@ The MariaDB module has been successfully converted to use a pure Gradle build sy
 
 ### Core Build Tasks
 
-| Task       | Description                              | Ant Equivalent |
-|------------|------------------------------------------|----------------|
-| `clean`    | Remove build directory                   | `clean`        |
-| `init`     | Initialize build and copy files          | `init`         |
-| `release`  | Process configuration files              | `release`      |
-| `bundle`   | Create distribution archive              | `bundle`       |
-| `build`    | Complete build process (default)         | `build`        |
-
-### New Utility Tasks
-
-| Task           | Description                          | Ant Equivalent |
-|----------------|--------------------------------------|----------------|
-| `validate`     | Validate configuration files         | N/A (new)      |
-| `listVersions` | List available MariaDB versions      | N/A (new)      |
+| Task                | Description                                                            |
+|---------------------|------------------------------------------------------------------------|
+| `info`              | Display build information and environment                              |
+| `release`           | Build a specific MariaDB version (interactive if no `-PbundleVersion`) |
+| `releaseAll`        | Prepare all local versions (copy to prep, no archive)                  |
+| `clean`             | Clean Gradle `./build` directory                                       |
+| `verify`            | Verify environment (Java, dev dir, 7-Zip, etc.)                        |
+| `listReleases`      | List versions from modules-untouched                                   |
+| `listVersions`      | List local versions under `bin/` and `bin/archived/`                   |
+| `validateProperties`| Validate required keys in `build.properties`                            |
+| `checkModulesUntouched` | Check integration with modules-untouched                           |
 
 ### Build Features
 
-| Feature                    | Status | Description                                |
-|----------------------------|--------|--------------------------------------------|
-| Incremental builds         | ✓      | Only rebuild changed files                 |
-| Build caching              | ✓      | Cache task outputs                         |
-| Parallel execution         | ✓      | Run independent tasks in parallel          |
-| Configuration validation   | ✓      | Validate bearsampp.conf files              |
-| Version management         | ✓      | Track MariaDB versions                     |
-| Environment variables      | ✓      | Support BEARSAMPP_BUILD_PATH               |
-| Cross-platform             | ✓      | Works on Windows, Linux, Mac               |
-| Type-safe configuration    | ✓      | Kotlin DSL with compile-time checks        |
-| Better error messages      | ✓      | Clear, actionable error messages           |
-| Structured logging         | ✓      | Info, debug, and quiet modes               |
+| Feature                    | Status | Description                                        |
+|----------------------------|--------|----------------------------------------------------|
+| Remote version resolution  | ✓      | modules-untouched `mariadb.properties` + fallback  |
+| Shared tmp/output layout   | ✓      | `<buildBase>/tmp` and `<buildBase>/<type>/<name>`  |
+| Hash generation            | ✓      | MD5/SHA1/SHA256/SHA512 for archives                |
+| 7-Zip integration          | ✓      | Uses `7z.exe` when `bundle.format=7z`              |
+| Environment verification   | ✓      | `verify` task checks prerequisites                 |
+
+Notes:
+- This module uses Groovy DSL (not Kotlin DSL).
+- `releases.properties` is preserved for legacy context but is not used by the Gradle build.
 
 ## Configuration
 

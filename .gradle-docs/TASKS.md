@@ -1,113 +1,198 @@
 # Gradle Tasks Reference
 
-This document provides detailed information about all available Gradle tasks in the MariaDB module.
+This document describes the tasks implemented in the current Groovy `build.gradle` for the MariaDB module. The build focuses on packaging MariaDB versions and sourcing binaries from the modules-untouched repository.
 
 ## Table of Contents
 
-- [Core Build Tasks](#core-build-tasks)
-- [Utility Tasks](#utility-tasks)
-- [Task Dependencies](#task-dependencies)
-- [Task Examples](#task-examples)
-- [Custom Task Options](#custom-task-options)
+- [Overview](#overview)
+- [Tasks](#tasks)
+  - [info](#info)
+  - [release](#release)
+  - [releaseAll](#releaseall)
+  - [clean](#clean)
+  - [verify](#verify)
+  - [listReleases](#listreleases)
+  - [listVersions](#listversions)
+  - [validateProperties](#validateproperties)
+  - [checkModulesUntouched](#checkmodulesuntouched)
+- [Examples](#examples)
+- [Outputs and Paths](#outputs-and-paths)
 
-## Core Build Tasks
+## Overview
 
-### clean
+Key characteristics of this build:
+- Version sources: modules-untouched `mariadb.properties` with fallback URL construction
+- Local overlay: files under `bin/mariadb<version>` are overlaid on downloaded contents
+- Temporary working dirs under shared `<buildBase>/tmp`
+- Packaging to 7z (default) or zip, plus hash files
 
-**Description**: Removes the build directory and all generated files.
+## Tasks
 
-**Usage**:
+### info
+
+Display build configuration (paths, Java/Gradle, bundle properties).
+
+Usage:
 ```bash
-./gradlew clean
+gradle info
 ```
 
-**What it does**:
-- Deletes `${buildPath}/module-mariadb` directory
-- Removes all temporary build artifacts
-- Prepares for a fresh build
-
-**When to use**:
-- Before creating a release build
-- When build artifacts are corrupted
-- To free up disk space
-- After changing build configuration
-
-**Output**:
-```
-> Task :clean
-BUILD SUCCESSFUL in 1s
-1 actionable task: 1 executed
-```
-
----
-
-### init
-
-**Description**: Initializes the build directory structure and copies source files.
-
-**Dependencies**: `clean`
-
-**Usage**:
-```bash
-./gradlew init
-```
-
-**What it does**:
-1. Creates build directory: `${buildPath}/module-mariadb`
-2. Copies `bin/` directory with all MariaDB versions
-3. Copies `releases.properties` to build directory
-4. Preserves directory structure
-
-**Files copied**:
-```
-${buildPath}/module-mariadb/
-├── bin/
-│   ├── mariadb10.11.14/
-│   ├── mariadb11.8.3/
-│   └── mariadb12.0.2/
-└── releases.properties
-```
-
-**Output**:
-```
-> Task :init
-Initialized build directory: C:/Bearsampp-build/module-mariadb
-BUILD SUCCESSFUL in 2s
-2 actionable tasks: 2 executed
-```
+Output: human-readable summary of configuration and environment.
 
 ---
 
 ### release
 
-**Description**: Processes configuration files and replaces version placeholders.
+Build a release package for a specific MariaDB version.
 
-**Dependencies**: `init`
-
-**Usage**:
+Usage (non-interactive):
 ```bash
-./gradlew release
+gradle release -PbundleVersion=12.0.2
 ```
 
-**What it does**:
-1. Finds all `bearsampp.conf` files in build directory
-2. Replaces `@RELEASE_VERSION@` with actual release version
-3. Validates processed files
-4. Reports processed files
+Usage (interactive):
+```bash
+gradle release
+```
+The interactive mode lists versions found under `bin/` and `bin/archived/` and lets you pick by index or exact version.
 
-**Example transformation**:
+Behavior:
+1. Resolve download URL from modules-untouched (or fallback format)
+2. Download archive to `<buildBase>/tmp/downloads/mariadb/`
+3. Extract to `<buildBase>/tmp/extract/mariadb/<version>/`
+4. Find extracted MariaDB root folder (contains `bin/mysqld.exe`)
+5. Prepare under `<buildBase>/tmp/bundles_prep/bins/mariadb/mariadb<version>/`
+6. Overlay files from local `bin/mariadb<version>` if present
+7. Package to `<buildBase>/<bundle.type>/<bundle.name>/<bundle.release>/`
+8. Generate MD5/SHA1/SHA256/SHA512 files
 
-**Before** (`bearsampp.conf`):
-```ini
-mariadbVersion = "12.0.2"
-bundleRelease = "@RELEASE_VERSION@"
+Requirements:
+- Java 8+
+- 7-Zip installed (for 7z format) or switch to `bundle.format=zip`
+
+---
+
+### releaseAll
+
+Prepare all locally available versions (found under `bin/` and `bin/archived/`). This task copies files to the prep location but does not create release archives.
+
+Usage:
+```bash
+gradle releaseAll
 ```
 
-**After**:
-```ini
-mariadbVersion = "12.0.2"
-bundleRelease = "2025.8.21"
+---
+
+### clean
+
+Clean Gradle's local `./build` directory used by tasks; does not remove the shared `<buildBase>`.
+
+Usage:
+```bash
+gradle clean
 ```
+
+---
+
+### verify
+
+Verify the environment is ready for building.
+
+Checks:
+- Java 8+
+- `build.properties` exists
+- `dev` directory exists at `<repo_root>/../dev`
+- `bin/` directory exists
+- 7-Zip installed when `bundle.format=7z`
+
+Usage:
+```bash
+gradle verify
+```
+
+---
+
+### listReleases
+
+List available versions from the remote modules-untouched `mariadb.properties`.
+
+Usage:
+```bash
+gradle listReleases
+```
+
+---
+
+### listVersions
+
+List versions available locally under `bin/` and `bin/archived/`.
+
+Usage:
+```bash
+gradle listVersions
+```
+
+---
+
+### validateProperties
+
+Validate required keys in `build.properties` (`bundle.name`, `bundle.release`, `bundle.type`, `bundle.format`).
+
+Usage:
+```bash
+gradle validateProperties
+```
+
+---
+
+### checkModulesUntouched
+
+Verify connectivity to modules-untouched and display available versions plus the version resolution strategy.
+
+Usage:
+```bash
+gradle checkModulesUntouched
+```
+
+## Examples
+
+```bash
+# Show build info
+gradle info
+
+# Build a specific version
+gradle release -PbundleVersion=12.0.2
+
+# Interactive selection
+gradle release
+
+# Prepare all versions (no archive)
+gradle releaseAll
+
+# Verify environment
+gradle verify
+
+# List remote and local versions
+gradle listReleases
+gradle listVersions
+```
+
+## Outputs and Paths
+
+- Build base path priority:
+  1) `build.path` in `build.properties`
+  2) `BEARSAMPP_BUILD_PATH` environment variable
+  3) Default: `<repo_root>/../bearsampp-build`
+
+- Temporary directories:
+  - Downloads: `<buildBase>/tmp/downloads/mariadb/`
+  - Extract: `<buildBase>/tmp/extract/mariadb/<version>/`
+  - Prep: `<buildBase>/tmp/bundles_prep/bins/mariadb/mariadb<version>/`
+  - Build (copy): `<buildBase>/tmp/bundles_build/bins/mariadb/mariadb<version>/`
+
+- Archives and hashes:
+  - `<buildBase>/<bundle.type>/<bundle.name>/<bundle.release>/bearsampp-mariadb-<version>-<bundle.release>.<7z|zip>`
+  - Hash files: `.md5`, `.sha1`, `.sha256`, `.sha512`
 
 **Output**:
 ```

@@ -1,34 +1,45 @@
 # Quick Reference Card
 
-Quick reference for common Gradle tasks and commands.
+Quick reference for common Gradle tasks and commands used by this module's Groovy `build.gradle`.
 
 ## Essential Commands
 
 ```bash
-# Build everything (default)
-./gradlew build
+# Show build info (default task)
+gradle info
 
-# Clean build directory
-./gradlew clean
+# Build one version (download if needed, then package)
+gradle release -PbundleVersion=12.0.2
 
-# Validate configuration
-./gradlew validate
+# Select a version interactively from local bin/ folders
+gradle release
 
-# List MariaDB versions
-./gradlew listVersions
+# Prepare all local versions (no packaging)
+gradle releaseAll
+
+# Verify environment
+gradle verify
+
+# Clean Gradle build dir
+gradle clean
+
+# List versions
+gradle listReleases
+gradle listVersions
 ```
 
-## Build Tasks
+## Tasks
 
-| Command                  | Description                          |
-|--------------------------|--------------------------------------|
-| `./gradlew build`        | Complete build (default)             |
-| `./gradlew clean`        | Remove build directory               |
-| `./gradlew init`         | Initialize build directory           |
-| `./gradlew release`      | Process configuration files          |
-| `./gradlew bundle`       | Create distribution archive          |
-| `./gradlew validate`     | Validate configuration files         |
-| `./gradlew listVersions` | List available MariaDB versions      |
+| Command                         | Description                                         |
+|---------------------------------|-----------------------------------------------------|
+| `gradle info`                   | Show configuration, paths, Java/Gradle versions     |
+| `gradle release -PbundleVersion`| Build specific version (non-interactive)            |
+| `gradle release`                | Interactive version selection                        |
+| `gradle releaseAll`             | Prepare all local versions (no archive)             |
+| `gradle verify`                 | Environment checks                                  |
+| `gradle listReleases`           | List releases from modules-untouched                |
+| `gradle listVersions`           | List versions under `bin/` and `bin/archived/`      |
+| `gradle validateProperties`     | Validate `build.properties` keys                    |
 
 ## Common Options
 
@@ -46,41 +57,29 @@ Quick reference for common Gradle tasks and commands.
 | File                   | Purpose                              |
 |------------------------|--------------------------------------|
 | `build.properties`     | Build configuration                  |
-| `releases.properties`  | Version mappings                     |
-| `bin/*/bearsampp.conf` | MariaDB version configurations       |
+| `bin/*/*`              | MariaDB version files (copied/overlaid) |
 
 ## Environment Variables
 
-| Variable                | Default Value        | Description              |
-|-------------------------|----------------------|--------------------------|
-| `BEARSAMPP_BUILD_PATH`  | `C:/Bearsampp-build` | Build output directory   |
-| `JAVA_HOME`             | (required)           | Java installation path   |
-| `GRADLE_OPTS`           | `-Xmx64m -Xms64m`    | JVM options for Gradle   |
+| Variable               | Default Value                           | Description                      |
+|------------------------|-----------------------------------------|----------------------------------|
+| `BEARSAMPP_BUILD_PATH` | If `build.path` not set: `<root>/bearsampp-build` | Build output base directory      |
+| `JAVA_HOME`            | (required)                              | Java installation path           |
+| `GRADLE_OPTS`          | (optional)                              | JVM options for Gradle           |
 
 ## build.properties
 
 ```properties
 bundle.name = mariadb          # Module name
-bundle.release = 2025.8.21     # Release version (YYYY.M.D)
+bundle.release = 2025.8.21     # Release (YYYY.M.D)
 bundle.type = bins             # Bundle type (bins/apps/tools)
 bundle.format = 7z             # Archive format (7z/zip)
-#build.path = C:/Bearsampp-build  # Optional build path
+#build.path = C:/Bearsampp-build  # Optional build base path
 ```
 
-## bearsampp.conf Template
+## Notes on configuration files
 
-```ini
-mariadbVersion = "X.X.X"
-mariadbExe = "bin/mysqld.exe"
-mariadbCliExe = "bin/mysql.exe"
-mariadbAdmin = "bin/mysqladmin.exe"
-mariadbConf = "my.ini"
-mariadbPort = "3307"
-mariadbRootUser = "root"
-mariadbRootPwd = ""
-
-bundleRelease = "@RELEASE_VERSION@"
-```
+The Gradle build does not edit config files. It copies the downloaded contents and overlays any files from your local `bin/mariadb<version>` directory.
 
 ## Quick Troubleshooting
 
@@ -97,35 +96,28 @@ bundleRelease = "@RELEASE_VERSION@"
 ```
 module-mariadb/
 ├── .gradle-docs/          # Documentation
-├── bin/                   # MariaDB binaries
+├── bin/                   # MariaDB binaries (optional local source)
 │   └── mariadbX.X.X/
-│       └── bearsampp.conf
-├── gradle/wrapper/        # Gradle wrapper
-├── build.gradle.kts       # Build script
+├── build.gradle           # Groovy build script
 ├── build.properties       # Configuration
-└── releases.properties    # Version mappings
+└── settings.gradle        # Gradle settings
 ```
 
 ## Adding New Version
 
 ```bash
-# 1. Create directory
+# Option A: Local binaries
 mkdir bin/mariadbX.X.X
+# Place binaries into bin/mariadbX.X.X/
 
-# 2. Add binaries to bin/mariadbX.X.X/
+# Option B: Remote version
+# Ensure version X.X.X exists in modules-untouched mariadb.properties
 
-# 3. Create bearsampp.conf
-# (Use template above)
+# Update release date (optional)
+# Edit build.properties: bundle.release = YYYY.M.D
 
-# 4. Update releases.properties
-# X.X.X = https://github.com/.../bearsampp-mariadb-X.X.X-YYYY.M.D.7z
-
-# 5. Update build.properties
-# bundle.release = YYYY.M.D
-
-# 6. Validate and build
-./gradlew validate
-./gradlew clean build
+# Build
+gradle release -PbundleVersion=X.X.X
 ```
 
 ## Git Workflow

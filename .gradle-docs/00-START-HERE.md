@@ -10,82 +10,76 @@ All documentation for the Gradle build system is organized in this directory.
 
 | If you want to...                          | Read this document                        |
 |--------------------------------------------|-------------------------------------------|
-| **Get started quickly**                    | [QUICK-REFERENCE.md](QUICK-REFERENCE.md)  |
-| **See usage examples**                     | [USAGE.md](USAGE.md)                      |
-| **Understand the build system**            | [README.md](README.md)                    |
-| **Learn about all tasks**                  | [TASKS.md](TASKS.md)                      |
-| **Configure the build**                    | [CONFIGURATION.md](CONFIGURATION.md)      |
-| **Migrate from Ant**                       | [MIGRATION.md](MIGRATION.md)              |
-| **See conversion details**                 | [CONVERSION-SUMMARY.md](CONVERSION-SUMMARY.md) |
-| **Browse all documentation**               | [INDEX.md](INDEX.md)                      |
+| Get started quickly                        | [QUICK-REFERENCE.md](QUICK-REFERENCE.md)  |
+| Understand the build system                | [README.md](README.md)                    |
+| Learn about all tasks                      | [TASKS.md](TASKS.md)                      |
+| Configure the build                        | [CONFIGURATION.md](CONFIGURATION.md)      |
+| Migrate from Ant                           | [MIGRATION.md](MIGRATION.md)              |
+| Browse all documentation                   | [INDEX.md](INDEX.md)                      |
 
 ## 🚀 Quick Start (5 minutes)
 
-### 1. List Available Versions
+### 1. Verify environment
+```bash
+gradle verify
+```
+
+### 2. List available local versions
 ```bash
 gradle listVersions
 ```
 
-### 2. Build Interactively
+### 3. Build interactively
 ```bash
 gradle release
 # Select version(s) when prompted
 ```
 
-### 3. Build All Versions
+### 4. Build a specific version (non-interactive)
 ```bash
-gradle build
+gradle release -PbundleVersion=12.0.2
+```
+
+### 5. Prepare all local versions (no archive)
+```bash
+gradle releaseAll
 ```
 
 ## 📖 Documentation Files
 
 ### Core Documentation
-- **[README.md](README.md)** (650 lines) - Complete build system guide
+- **[README.md](README.md)** - Complete build system guide
   - Overview, prerequisites, project structure
   - Build configuration, tasks, troubleshooting
   - Release management, contributing
 
-- **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** (200 lines) - Command cheat sheet
+- **[QUICK-REFERENCE.md](QUICK-REFERENCE.md)** - Command cheat sheet
   - Essential commands
   - Common tasks
   - Quick troubleshooting
 
-- **[USAGE.md](USAGE.md)** - Detailed usage examples
-  - Step-by-step workflows
-  - Real-world examples
-  - Best practices
 
 ### Task & Configuration
-- **[TASKS.md](TASKS.md)** (850 lines) - Detailed task reference
+- **[TASKS.md](TASKS.md)** - Detailed task reference
   - All tasks explained
   - Examples and options
   - Performance tips
 
-- **[CONFIGURATION.md](CONFIGURATION.md)** (900 lines) - Configuration guide
+- **[CONFIGURATION.md](CONFIGURATION.md)** - Configuration guide
   - Complete property reference
   - Environment variables
   - Advanced configuration
 
 ### Migration & History
-- **[MIGRATION.md](MIGRATION.md)** (750 lines) - Ant to Gradle migration
+- **[MIGRATION.md](MIGRATION.md)** - Ant to Gradle migration
   - Why Gradle?
   - Feature comparison
   - Migration steps
 
-- **[SUMMARY.md](SUMMARY.md)** (400 lines) - Conversion summary
+- **[SUMMARY.md](SUMMARY.md)** - Conversion summary
   - Files created/updated/removed
   - Statistics and metrics
   - Checklist
-
-- **[CONVERSION-SUMMARY.md](CONVERSION-SUMMARY.md)** - Groovy DSL details
-  - Groovy vs Kotlin comparison
-  - No wrapper approach
-  - Key differences
-
-- **[CONVERSION-COMPLETE.md](CONVERSION-COMPLETE.md)** - Final status
-  - What was done
-  - File summary
-  - Next steps
 
 ### Reference
 - **[INDEX.md](INDEX.md)** (250 lines) - Complete documentation index
@@ -94,11 +88,9 @@ gradle build
   - By task
   - Search by keyword
 
-### Utilities
-- **[verify-gradle-conversion.bat](verify-gradle-conversion.bat)** - Verification script
-  - Checks all files are in place
-  - Validates configuration
-  - Reports status
+### Tips
+- Use `gradle info` to print all important paths and environment details.
+- If 7-Zip is not detected and `bundle.format=7z`, install 7-Zip or set `7Z_HOME`.
 
 ## 🎯 Common Tasks
 
@@ -120,17 +112,23 @@ gradle release
 # Enter: 1,3,5 (comma-separated)
 ```
 
-### Build All Versions
+### Build All Local Versions (no archive)
 ```bash
-gradle build
+gradle releaseAll
 ```
-Non-interactive - builds everything
+Prepares all versions found under `bin/` and `bin/archived/`.
 
 ### Validate Configuration
 ```bash
-gradle validate
+gradle validateProperties
 ```
-Checks all `bearsampp.conf` files
+Validates required keys in `build.properties`.
+
+### Verify Environment
+```bash
+gradle verify
+```
+Checks Java, dev path, bin directory, and 7‑Zip (when using 7z format).
 
 ### Clean Build Directory
 ```bash
@@ -143,10 +141,10 @@ gradle clean
 |-------------------|-------|--------|--------------------------------|
 | Core Docs         | 3     | 1,500  | Main guides and references     |
 | Task & Config     | 2     | 1,750  | Detailed technical docs        |
-| Migration         | 4     | 2,300  | Conversion and history         |
+| Migration         | 1     | 700    | Conversion and history         |
 | Reference         | 1     | 250    | Complete index                 |
-| Utilities         | 1     | -      | Helper scripts                 |
-| **Total**         | **11**| **5,800+** | **Complete documentation** |
+| Utilities         | 0     | -      | Helper scripts                 |
+| **Total**         | **7** | **4,200+** | **Current documentation**   |
 
 ## 🔍 Finding Information
 
@@ -155,7 +153,7 @@ gradle clean
 **Beginner** (Never used Gradle)
 1. [QUICK-REFERENCE.md](QUICK-REFERENCE.md) - Learn basic commands
 2. [README.md § Quick Start](README.md#quick-start) - First build
-3. [USAGE.md](USAGE.md) - See examples
+3. [TASKS.md](TASKS.md) - Task examples and usage
 
 **Intermediate** (Some Gradle experience)
 1. [README.md](README.md) - Complete guide
@@ -172,7 +170,6 @@ gradle clean
 **Building**
 - [QUICK-REFERENCE.md § Build Tasks](QUICK-REFERENCE.md#build-tasks)
 - [TASKS.md § Core Build Tasks](TASKS.md#core-build-tasks)
-- [USAGE.md](USAGE.md)
 
 **Configuring**
 - [CONFIGURATION.md](CONFIGURATION.md)
@@ -185,15 +182,14 @@ gradle clean
 
 **Migrating from Ant**
 - [MIGRATION.md](MIGRATION.md)
-- [CONVERSION-SUMMARY.md](CONVERSION-SUMMARY.md)
 
 ## 💡 Tips
 
 1. **Start with Quick Reference** - Get up and running in 5 minutes
 2. **Use Interactive Mode** - `gradle release` prompts for version selection
-3. **Validate First** - Run `gradle validate` before building
+3. **Validate First** - Run `gradle validateProperties` before building
 4. **Check Documentation Index** - [INDEX.md](INDEX.md) has everything organized
-5. **Read Examples** - [USAGE.md](USAGE.md) has real-world workflows
+5. **Read Examples** - See examples in [TASKS.md](TASKS.md)
 
 ## 🆘 Getting Help
 

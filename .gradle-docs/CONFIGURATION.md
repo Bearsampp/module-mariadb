@@ -1,14 +1,15 @@
 # Configuration Guide
 
-This document provides detailed information about configuring the MariaDB module build system.
+This guide explains how to configure the MariaDB module Gradle build and how paths, versions, and packaging are determined.
 
 ## Table of Contents
 
 - [Build Properties](#build-properties)
-- [Release Properties](#release-properties)
-- [Configuration Files](#configuration-files)
+- [Paths and Directories](#paths-and-directories)
 - [Environment Variables](#environment-variables)
-- [Advanced Configuration](#advanced-configuration)
+- [Version Resolution](#version-resolution)
+- [Packaging](#packaging)
+- [Requirements](#requirements)
 
 ## Build Properties
 
@@ -16,11 +17,11 @@ This document provides detailed information about configuring the MariaDB module
 
 The `build.properties` file contains the main build configuration.
 
-**Location**: `./build.properties`
+Location: `./build.properties`
 
-**Format**: Java Properties file
+Format: Java Properties file
 
-**Example**:
+Example:
 ```properties
 bundle.name = mariadb
 bundle.release = 2025.8.21
@@ -30,84 +31,76 @@ bundle.format = 7z
 #build.path = C:/Bearsampp-build
 ```
 
-### Property Reference
+Property reference:
 
-| Property         | Type     | Required | Default Value          | Description                                    |
-|------------------|----------|----------|------------------------|------------------------------------------------|
-| `bundle.name`    | String   | Yes      | `mariadb`              | Module name (do not change)                    |
-| `bundle.release` | String   | Yes      | -                      | Release version (YYYY.M.D format)              |
-| `bundle.type`    | String   | Yes      | `bins`                 | Bundle type: `bins`, `apps`, or `tools`        |
-| `bundle.format`  | String   | Yes      | `7z`                   | Archive format: `7z` or `zip`                  |
-| `build.path`     | String   | No       | `C:/Bearsampp-build`   | Build output directory (optional)              |
+| Property         | Type   | Required | Default             | Description                                   |
+|------------------|--------|----------|---------------------|-----------------------------------------------|
+| `bundle.name`    | String | Yes      | `mariadb`           | Module name (fixed for this repo)             |
+| `bundle.release` | String | Yes      | -                   | Date-based bundle release (YYYY.M.D)          |
+| `bundle.type`    | String | Yes      | `bins`              | One of `bins`, `apps`, `tools`                |
+| `bundle.format`  | String | Yes      | `7z`                | `7z` or `zip`                                 |
+| `build.path`     | String | No       | `<root>/bearsampp-build` | Build base path (overrides env if set)   |
 
-### Property Details
+Notes:
+- `bundle.release` is used in the archive name and output directory path.
+- The build does not rewrite configuration files; it only copies/overlays files.
 
-#### bundle.name
+## Paths and Directories
 
-**Purpose**: Identifies the module name.
+Build base path resolution priority:
+1. `build.path` in `build.properties` (if set)
+2. Environment variable `BEARSAMPP_BUILD_PATH`
+3. Default: `<repo_root>/../bearsampp-build`
 
-**Valid values**: `mariadb` (fixed)
+Temporary working directories (under `<buildBase>/tmp`):
+- Downloads: `<buildBase>/tmp/downloads/mariadb/`
+- Extract: `<buildBase>/tmp/extract/mariadb/<version>/`
+- Prep: `<buildBase>/tmp/bundles_prep/bins/mariadb/mariadb<version>/`
+- Build (copy): `<buildBase>/tmp/bundles_build/bins/mariadb/mariadb<version>/`
 
-**Usage**: Used in:
-- Archive naming: `bearsampp-${bundle.name}-${bundle.release}.${bundle.format}`
-- Build directory: `${build.path}/module-${bundle.name}`
-- Task configuration
+Final archives and hashes:
+- `<buildBase>/<bundle.type>/<bundle.name>/<bundle.release>/bearsampp-mariadb-<version>-<bundle.release>.<7z|zip>`
+- Hash files alongside: `.md5`, `.sha1`, `.sha256`, `.sha512`
 
-**Example**:
-```properties
-bundle.name = mariadb
-```
+## Environment Variables
 
-**Note**: Do not change this value as it's tied to the module identity.
+| Variable               | Purpose                                      |
+|------------------------|----------------------------------------------|
+| `BEARSAMPP_BUILD_PATH` | Optional override for the build base path    |
+| `JAVA_HOME`            | Path to JDK 8+                               |
+| `7Z_HOME`              | Optional. Explicit 7-Zip installation path   |
 
----
+7-Zip lookup order:
+1. `%7Z_HOME%/7z.exe`
+2. Common install paths (e.g., `C:\Program Files\7-Zip\7z.exe`)
+3. System `PATH` via `where 7z.exe`
 
-#### bundle.release
+## Version Resolution
 
-**Purpose**: Specifies the release version.
+The build downloads MariaDB from the modules-untouched repository using this strategy:
+1. Fetch remote `mariadb.properties` file:
+   `https://raw.githubusercontent.com/Bearsampp/modules-untouched/main/modules/mariadb.properties`
+2. If the requested version is present, use the provided URL.
+3. If not present or fetch fails, construct the fallback URL:
+   `https://github.com/Bearsampp/modules-untouched/releases/download/mariadb-<version>/mariadb-<version>-win64.7z`
 
-**Format**: `YYYY.M.D` (date-based versioning)
-- `YYYY`: Four-digit year
-- `M`: Month (1-12, no leading zero)
-- `D`: Day (1-31, no leading zero)
+Local overlays:
+- If `bin/mariadb<version>` exists locally, its files are overlaid onto the downloaded/extracted content during packaging.
 
-**Valid examples**:
-```properties
-bundle.release = 2025.8.21    # August 21, 2025
-bundle.release = 2025.12.1    # December 1, 2025
-bundle.release = 2026.1.15    # January 15, 2026
-```
+## Packaging
 
-**Invalid examples**:
-```properties
-bundle.release = 2025.08.21   # ❌ Leading zero in month
-bundle.release = 2025.8.5.1   # ❌ Too many components
-bundle.release = v2025.8.21   # ❌ Prefix not allowed
-bundle.release = 1.0.0        # ❌ Not date-based
-```
+Packaging format is controlled by `bundle.format`:
+- `7z`: Requires 7-Zip. The build calls `7z a -t7z` to create the archive.
+- `zip`: Uses Gradle's Zip task.
 
-**Usage**: Replaced in:
-- `bearsampp.conf` files: `@RELEASE_VERSION@` → `2025.8.21`
-- Archive filename: `bearsampp-mariadb-2025.8.21.7z`
-- Build metadata
+For each archive, the build also generates `.md5`, `.sha1`, `.sha256`, and `.sha512` files.
 
----
+## Requirements
 
-#### bundle.type
-
-**Purpose**: Categorizes the module type.
-
-**Valid values**:
-- `bins`: Binary executables (MariaDB, MySQL, etc.)
-- `apps`: Applications (Adminer, phpMyAdmin, etc.)
-- `tools`: Development tools (Git, Composer, etc.)
-
-**Current value**: `bins` (MariaDB is a binary module)
-
-**Example**:
-```properties
-bundle.type = bins
-```
+- Java 8+ (JDK)
+- 7-Zip installed and discoverable when `bundle.format=7z`
+- `dev` directory must exist at `<repo_root>/../dev` (project layout assumption)
+- Internet access to download from modules-untouched (unless using only local `bin/` sources)
 
 **Note**: This value should remain `bins` for the MariaDB module.
 
@@ -128,11 +121,13 @@ bundle.type = bins
 | `7z`   | Excellent (~40%)  | Slower   | Requires 7-Zip|
 | `zip`  | Good (~60%)       | Faster   | Universal     |
 
-**Example**:
+Examples:
 ```properties
 # Use 7z for releases (better compression)
 bundle.format = 7z
-
+```
+or
+```properties
 # Use zip for testing (faster)
 bundle.format = zip
 ```
@@ -168,127 +163,36 @@ bundle.format = zip
 - Will be created if it doesn't exist
 - Use forward slashes `/` or escaped backslashes `\\`
 
-**Valid examples**:
+Valid examples:
 ```properties
 build.path = C:/Bearsampp-build
+```
+```properties
 build.path = D:/Build/Bearsampp
+```
+```properties
 build.path = E:/Projects/bearsampp-builds
+```
+```properties
 build.path = C:\\Bearsampp-build
 ```
 
-**Invalid examples**:
+Invalid examples:
 ```properties
 build.path = ./build              # ❌ Relative path
+```
+```properties
 build.path = build                # ❌ Relative path
-build.path = C:\Bearsampp-build   # ❌ Unescaped backslashes
 ```
-
----
-
-## Release Properties
-
-### releases.properties
-
-The `releases.properties` file maps MariaDB versions to their download URLs.
-
-**Location**: `./releases.properties`
-
-**Format**: Java Properties file (key = value)
-
-**Example**:
 ```properties
-10.11.14 = https://github.com/Bearsampp/module-mariadb/releases/download/2025.8.21/bearsampp-mariadb-10.11.14-2025.8.21.7z
-11.8.3 = https://github.com/Bearsampp/module-mariadb/releases/download/2025.8.21/bearsampp-mariadb-11.8.3-2025.8.21.7z
-12.0.2 = https://github.com/Bearsampp/module-mariadb/releases/download/2025.8.21/bearsampp-mariadb-12.0.2-2025.8.21.7z
-```
-
-### Property Format
-
-**Key**: MariaDB version number
-**Value**: Download URL
-
-**Syntax**:
-```properties
-<version> = <url>
-```
-
-**Version format**:
-- Major.Minor.Patch: `10.11.14`
-- With suffix: `11.1.1-RC`, `11.5.1-RC`
-
-**URL format**:
-```
-https://github.com/Bearsampp/module-mariadb/releases/download/<tag>/bearsampp-mariadb-<version>-<release>.7z
-```
-
-### Adding New Versions
-
-1. **Add entry to releases.properties**:
-   ```properties
-   12.1.0 = https://github.com/Bearsampp/module-mariadb/releases/download/2025.9.1/bearsampp-mariadb-12.1.0-2025.9.1.7z
-   ```
-
-2. **Create version directory**:
-   ```
-   bin/mariadb12.1.0/
-   ```
-
-3. **Add bearsampp.conf**:
-   ```ini
-   mariadbVersion = "12.1.0"
-   mariadbExe = "bin/mysqld.exe"
-   mariadbCliExe = "bin/mysql.exe"
-   mariadbAdmin = "bin/mysqladmin.exe"
-   mariadbConf = "my.ini"
-   mariadbPort = "3307"
-   mariadbRootUser = "root"
-   mariadbRootPwd = ""
-   
-   bundleRelease = "@RELEASE_VERSION@"
-   ```
-
-4. **Validate**:
-   ```bash
-   ./gradlew validate
-   ```
-
-### Version Ordering
-
-Versions are sorted alphanumerically:
-```properties
-10.3.37
-10.4.27
-10.5.18
-...
-11.8.3
-12.0.2
+build.path = C:\\Bearsampp-build   # ❌ Unescaped backslashes (single backslashes)
 ```
 
 ---
 
 ## Configuration Files
 
-### bearsampp.conf
-
-Each MariaDB version has a `bearsampp.conf` file.
-
-**Location**: `bin/mariadb<version>/bearsampp.conf`
-
-**Format**: INI-style configuration
-
-**Example**: `bin/mariadb12.0.2/bearsampp.conf`
-```ini
-mariadbVersion = "12.0.2"
-mariadbExe = "bin/mysqld.exe"
-mariadbCliExe = "bin/mysql.exe"
-mariadbAdmin = "bin/mysqladmin.exe"
-mariadbConf = "my.ini"
-mariadbPort = "3307"
-mariadbRootUser = "root"
-mariadbRootPwd = ""
-
-bundleRelease = "@RELEASE_VERSION@"
-```
+The Gradle build copies files from the source (downloaded archive or local `bin/mariadb<version>`) and overlays local files. It does not edit or template configuration files.
 
 ### Property Reference
 
