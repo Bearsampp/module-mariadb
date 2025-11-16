@@ -95,6 +95,10 @@ Packaging format is controlled by `bundle.format`:
 
 For each archive, the build also generates `.md5`, `.sha1`, `.sha256`, and `.sha512` files.
 
+Archive contents layout:
+- The archive root contains the version folder `mariadb<version>` (for example, `mariadb11.8.3`).
+- All files are inside that folder, mirroring the behavior of the historical Ant `build.xml` used by module-bruno.
+
 ## Requirements
 
 - Java 8+ (JDK)

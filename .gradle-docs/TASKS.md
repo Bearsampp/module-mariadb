@@ -218,10 +218,11 @@ BUILD SUCCESSFUL in 3s
 ```
 
 **What it does**:
-1. Compresses `module-mariadb` directory
-2. Creates archive with naming: `bearsampp-mariadb-${version}.${format}`
-3. Uses optimal compression settings
-4. Reports file size
+1. Compresses the prepared version folder `mariadb<version>`
+2. Creates archive with naming: `bearsampp-mariadb-${version}-${bundle.release}.${format}`
+3. Ensures the archive root contains the folder `mariadb<version>` (e.g., `mariadb11.8.3`) and all files are inside it
+4. Uses optimal compression settings
+5. Reports file size
 
 **Compression settings**:
 
