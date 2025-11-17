@@ -1,400 +1,488 @@
-# MariaDB Module - Gradle Build Documentation
-
-<p align="center">
-  <a href="https://bearsampp.com/contribute" target="_blank">
-    <img width="250" src="../img/Bearsampp-logo.svg" alt="Bearsampp Logo">
-  </a>
-</p>
-
-[![GitHub release](https://img.shields.io/github/release/bearsampp/module-mariadb.svg?style=flat-square)](https://github.com/bearsampp/module-mariadb/releases/latest)
-![Total downloads](https://img.shields.io/github/downloads/bearsampp/module-mariadb/total.svg?style=flat-square)
+# Bearsampp Module MariaDB - Gradle Build Documentation
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Project Structure](#project-structure)
-- [Build Configuration](#build-configuration)
-- [Gradle Tasks](#gradle-tasks)
-- [Building the Module](#building-the-module)
-- [Configuration Files](#configuration-files)
-- [Release Management](#release-management)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Build Tasks](#build-tasks)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
 - [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
+- [Migration Guide](#migration-guide)
+
+---
 
 ## Overview
 
-This is a module of the [Bearsampp project](https://github.com/bearsampp/bearsampp) involving MariaDB. The module has been converted to use a pure Gradle build system for improved maintainability and cross-platform compatibility.
+The Bearsampp Module MariaDB project has been converted to a **pure Gradle build system**, replacing the legacy Ant build configuration. This provides:
 
-### Key Features
+- **Modern Build System**     - Native Gradle tasks and conventions
+- **Better Performance**       - Incremental builds and caching
+- **Simplified Maintenance**   - Pure Groovy/Gradle DSL
+- **Enhanced Tooling**         - IDE integration and dependency management
+- **Cross-Platform Support**   - Works on Windows, Linux, and macOS
 
-- Pure Gradle build (Groovy DSL), no Ant required
-- Automated download and extraction of MariaDB binaries
-- Version resolution from modules-untouched repository with safe fallback
-- Standardized output layout under a shared `bearsampp-build` directory
-- Optional 7z or zip packaging with integrity hashes (MD5/SHA1/SHA256/SHA512)
+### Project Information
 
-## Prerequisites
+| Property          | Value                                    |
+|-------------------|------------------------------------------|
+| **Project Name**  | module-mariadb                           |
+| **Group**         | com.bearsampp.modules                    |
+| **Type**          | MariaDB Module Builder                   |
+| **Build Tool**    | Gradle 7.x+                              |
+| **Language**      | Groovy (Gradle DSL)                      |
 
-| Tool   | Version | Required | Purpose                         |
-|--------|---------|----------|---------------------------------|
-| Java   | 8+      | Yes      | Gradle runtime                  |
-| Gradle | 7+      | Yes      | Build automation (local or via wrapper) |
-| 7-Zip  | Latest  | Yes      | Required when `bundle.format=7z`|
-| Git    | 2.0+    | No       | Optional (for development)      |
+---
 
-### Environment Variables
+## Quick Start
 
-| Variable               | Default Value                         | Description                                                      |
-|------------------------|---------------------------------------|------------------------------------------------------------------|
-| `BEARSAMPP_BUILD_PATH` | If `build.path` not set: `<root>/bearsampp-build` | Optional override for build output base folder                   |
-| `JAVA_HOME`            | (required)                            | Java installation directory                                      |
+### Prerequisites
 
-## Project Structure
+| Requirement       | Version       | Purpose                                  |
+|-------------------|---------------|------------------------------------------|
+| **Java**          | 8+            | Required for Gradle execution            |
+| **Gradle**        | 7.0+          | Build automation tool                    |
+| **7-Zip**         | Latest        | Archive creation (required for 7z)       |
 
-```
-module-mariadb/
-├── .gradle-docs/              # Gradle build documentation
-│   ├── README.md              # Main documentation (this file)
-│   ├── TASKS.md               # Detailed task reference
-│   ├── CONFIGURATION.md       # Configuration guide
-│   └── MIGRATION.md           # Ant to Gradle migration guide
-├── bin/                       # MariaDB binaries by version
-│   ├── mariadb10.11.14/
-│   │   └── bearsampp.conf     # Version-specific configuration
-│   ├── mariadb11.8.3/
-│   │   └── bearsampp.conf
-│   └── mariadb12.0.2/
-│       └── bearsampp.conf
-├── img/                       # Project images
-│   └── Bearsampp-logo.svg
-├── .editorconfig              # Editor configuration
-├── .gitignore                 # Git ignore rules
-├── build.gradle               # Main Gradle build script (Groovy)
-├── build.properties           # Build configuration
-├── LICENSE                    # Project license
-├── README.md                  # Project overview
-├── releases.properties        # (Legacy) Not used by Gradle build
-└── settings.gradle            # Gradle settings
+### Basic Commands
+
+```bash
+# Display build information
+gradle info
+
+# List all available tasks
+gradle tasks
+
+# Verify build environment
+gradle verify
+
+# Build a release (interactive)
+gradle release
+
+# Build a specific version (non-interactive)
+gradle release -PbundleVersion=12.0.2
+
+# Clean build artifacts
+gradle clean
 ```
 
-## Build Configuration
+---
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/bearsampp/module-mariadb.git
+cd module-mariadb
+```
+
+### 2. Verify Environment
+
+```bash
+gradle verify
+```
+
+This will check:
+- Java version (8+)
+- Required files (build.properties)
+- Directory structure (bin/, dev/)
+- Build dependencies
+
+### 3. List Available Versions
+
+```bash
+gradle listVersions
+```
+
+### 4. Build Your First Release
+
+```bash
+# Interactive mode (prompts for version)
+gradle release
+
+# Or specify version directly
+gradle release -PbundleVersion=12.0.2
+```
+
+---
+
+## Build Tasks
+
+### Core Build Tasks
+
+| Task                  | Description                                      | Example                                  |
+|-----------------------|--------------------------------------------------|------------------------------------------|
+| `release`             | Build and package release (interactive/non-interactive) | `gradle release -PbundleVersion=12.0.2` |
+| `releaseAll`          | Build all available versions (prep only)         | `gradle releaseAll`                      |
+| `clean`               | Clean build artifacts and temporary files        | `gradle clean`                           |
+
+### Verification Tasks
+
+| Task                      | Description                                  | Example                                      |
+|---------------------------|----------------------------------------------|----------------------------------------------|
+| `verify`                  | Verify build environment and dependencies    | `gradle verify`                              |
+| `validateProperties`      | Validate build.properties configuration      | `gradle validateProperties`                  |
+
+### Information Tasks
+
+| Task                | Description                                      | Example                    |
+|---------------------|--------------------------------------------------|----------------------------|
+| `info`              | Display build configuration information          | `gradle info`              |
+| `listVersions`      | List available bundle versions in bin/           | `gradle listVersions`      |
+| `listReleases`      | List all available releases from modules-untouched | `gradle listReleases`    |
+| `checkModulesUntouched` | Check modules-untouched integration          | `gradle checkModulesUntouched` |
+
+### Task Groups
+
+| Group            | Purpose                                          |
+|------------------|--------------------------------------------------|
+| **build**        | Build and package tasks                          |
+| **verification** | Verification and validation tasks                |
+| **help**         | Help and information tasks                       |
+
+---
+
+## Configuration
 
 ### build.properties
 
 The main configuration file for the build:
 
 ```properties
-bundle.name = mariadb
-bundle.release = 2025.8.21
-bundle.type = bins
-bundle.format = 7z
-
-#build.path = C:/Bearsampp-build
+bundle.name     = mariadb
+bundle.release  = 2025.8.21
+bundle.type     = bins
+bundle.format   = 7z
 ```
 
-| Property         | Description                              | Default Value          |
-|------------------|------------------------------------------|------------------------|
-| `bundle.name`    | Module name                              | `mariadb`              |
-| `bundle.release` | Release version (YYYY.M.D format)        | `2025.8.21`            |
-| `bundle.type`    | Bundle type (bins/apps/tools)            | `bins`                 |
-| `bundle.format`  | Archive format (7z/zip)                  | `7z`                   |
-| `build.path`     | Build output directory (optional)        | `C:/Bearsampp-build`   |
+| Property          | Description                          | Example Value  |
+|-------------------|--------------------------------------|----------------|
+| `bundle.name`     | Name of the bundle                   | `mariadb`      |
+| `bundle.release`  | Release version                      | `2025.8.21`    |
+| `bundle.type`     | Type of bundle                       | `bins`         |
+| `bundle.format`   | Archive format                       | `7z`           |
+
+### gradle.properties
+
+Gradle-specific configuration:
+
+```properties
+# Gradle daemon configuration
+org.gradle.daemon=true
+org.gradle.parallel=true
+org.gradle.caching=true
+
+# JVM settings
+org.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m
+```
+
+### Directory Structure
+
+```
+module-mariadb/
+├── .gradle-docs/          # Gradle documentation
+│   ├── README.md          # Main documentation
+│   ├── TASKS.md           # Task reference
+│   └── CONFIGURATION.md   # Configuration guide
+├── bin/                   # MariaDB version bundles
+│   ├── mariadb10.11.14/
+│   ├── mariadb11.8.3/
+│   ├── mariadb12.0.2/
+│   └── archived/          # Archived versions
+│       └── ...
+bearsampp-build/                    # External build directory (outside repo)
+├── tmp/                            # Temporary build files
+│   ├── bundles_prep/bins/mariadb/  # Prepared bundles
+│   ├── bundles_build/bins/mariadb/ # Build staging
+│   ├── downloads/mariadb/          # Downloaded dependencies
+│   └── extract/mariadb/            # Extracted archives
+└── bins/mariadb/                   # Final packaged archives
+    └── 2025.8.21/                  # Release version
+        ├── bearsampp-mariadb-12.0.2-2025.8.21.7z
+        ├── bearsampp-mariadb-12.0.2-2025.8.21.7z.md5
+        └── ...
+├── build.gradle           # Main Gradle build script
+├── settings.gradle        # Gradle settings
+├── build.properties       # Build configuration
+└── releases.properties    # (Legacy - not used by Gradle)
+```
+
+---
+
+## Architecture
+
+### Build Process Flow
+
+```
+1. User runs: gradle release -PbundleVersion=12.0.2
+                    ↓
+2. Validate environment and version
+                    ↓
+3. Check if binaries exist in bin/mariadb12.0.2/
+                    ↓
+4. If not found, download from modules-untouched
+   - Fetch mariadb.properties from modules-untouched
+   - Download MariaDB archive
+   - Extract to tmp/extract/
+                    ↓
+5. Create preparation directory (tmp/bundles_prep/)
+                    ↓
+6. Copy MariaDB files to prep directory
+                    ↓
+7. Overlay bundle files from bin/ directory
+                    ↓
+8. Copy to bundles_build directory
+                    ↓
+9. Package prepared folder into archive
+   - Archive includes top-level folder: mariadb{version}/
+   - Location: bearsampp-build/bins/mariadb/{bundle.release}/
+                    ↓
+10. Generate hash files (MD5, SHA1, SHA256, SHA512)
+```
 
 ### Version Resolution Strategy
 
-The build no longer uses local `releases.properties` for downloads.
+The build uses a two-tier strategy for resolving MariaDB binaries:
 
-Order of resolution for MariaDB binaries:
-1. Load remote `mariadb.properties` from modules-untouched (primary)
+1. **Primary Source**: Remote `mariadb.properties` from modules-untouched
    - URL: `https://raw.githubusercontent.com/Bearsampp/modules-untouched/main/modules/mariadb.properties`
-2. If a version is not listed or the fetch fails, construct a standard fallback URL:
-   - `https://github.com/Bearsampp/modules-untouched/releases/download/mariadb-${version}/mariadb-${version}-win64.7z`
+   - Contains direct download URLs for each version
 
-## Gradle Tasks
+2. **Fallback**: Standard URL format construction
+   - Format: `https://github.com/Bearsampp/modules-untouched/releases/download/mariadb-{version}/mariadb-{version}-win64.7z`
+   - Used when version not found in mariadb.properties or fetch fails
 
-The default task is `info`. Key tasks provided by this build:
+### Packaging Details
 
-| Task                    | Description                                                                 |
-|-------------------------|-----------------------------------------------------------------------------|
-| `info`                  | Display build configuration, paths, Java/Gradle versions                   |
-| `release -PbundleVersion=X.Y.Z` | Build a specific MariaDB version (downloads if missing, packages and hashes) |
-| `release`               | Interactive mode: choose a version from `bin/` or `bin/archived/`          |
-| `releaseAll`            | Prepares all available versions (copies into tmp prep). Does not archive.  |
-| `clean`                 | Cleans Gradle build dir only (`./build`)                                   |
-| `verify`                | Environment checks: Java, build.properties, dev dir, 7-Zip (for 7z)        |
-| `listReleases`          | List versions from remote modules-untouched `mariadb.properties`           |
-| `listVersions`          | List versions found under local `bin/` and `bin/archived/`                 |
-| `validateProperties`    | Validate required keys in `build.properties`                               |
-| `checkModulesUntouched` | Verify connectivity and list versions from modules-untouched               |
+- **Archive name format**: `bearsampp-mariadb-{version}-{bundle.release}.{7z|zip}`
+- **Location**: `bearsampp-build/bins/mariadb/{bundle.release}/`
+  - Example: `bearsampp-build/bins/mariadb/2025.8.21/bearsampp-mariadb-12.0.2-2025.8.21.7z`
+- **Content root**: The top-level folder inside the archive is `mariadb{version}/` (e.g., `mariadb12.0.2/`)
+- **Structure**: The archive contains the MariaDB version folder at the root with all MariaDB files inside
 
-### Task Execution Examples
+**Archive Structure Example**:
+```
+bearsampp-mariadb-12.0.2-2025.8.21.7z
+└── mariadb12.0.2/          ← Version folder at root
+    ├── bin/
+    │   ├── mysqld.exe
+    │   ├── mysql.exe
+    │   └── ...
+    ├── lib/
+    ├── share/
+    ├── my.ini
+    └── bearsampp.conf
+```
+
+**Verification Commands**:
 
 ```bash
-# Show build info (default)
-gradle info
+# List archive contents with 7z
+7z l bearsampp-build/bins/mariadb/2025.8.21/bearsampp-mariadb-12.0.2-2025.8.21.7z | more
 
-# Build specific version (non-interactive)
-gradle release -PbundleVersion=12.0.2
+# You should see entries beginning with:
+#   mariadb12.0.2/bin/mysqld.exe
+#   mariadb12.0.2/bin/mysql.exe
+#   mariadb12.0.2/lib/...
+#   mariadb12.0.2/...
 
-# Build interactively (choose from local versions)
-gradle release
+# Extract and inspect with PowerShell
+Expand-Archive -Path bearsampp-build/bins/mariadb/2025.8.21/bearsampp-mariadb-12.0.2-2025.8.21.zip -DestinationPath .\_inspect
+Get-ChildItem .\_inspect\mariadb12.0.2 | Select-Object Name
 
-# Prepare all locally available versions (no archive)
-gradle releaseAll
-
-# Verify environment
-gradle verify
-
-# List releases from modules-untouched
-gradle listReleases
-
-# List local versions
-gradle listVersions
-
-# Debugging
-gradle info --stacktrace --info
+# Expected output:
+#   bin/
+#   lib/
+#   share/
+#   my.ini
+#   bearsampp.conf
+#   ...
 ```
 
-## Building the Module
+**Note**: This archive structure matches other Bearsampp module patterns where archives contain `{module}{version}/` at the root. This ensures consistency across all Bearsampp modules.
 
-### Quick Start
+**Hash Files**: Each archive is accompanied by hash sidecar files:
+- `.md5` - MD5 checksum
+- `.sha1` - SHA-1 checksum
+- `.sha256` - SHA-256 checksum
+- `.sha512` - SHA-512 checksum
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/bearsampp/module-mariadb.git
-   cd module-mariadb
-   ```
-
-2. **Verify prerequisites**:
-   ```bash
-   java -version    # Should be 1.8+ (8 or newer)
-   7z --help        # Required when using 7z archive format
-   ```
-
-3. **Build a release archive for a version**:
-   ```bash
-   # Example: build MariaDB 12.0.2
-   gradle release -PbundleVersion=12.0.2
-   ```
-
-4. **Find the output**:
-   ```
-   <buildBase>/<bundle.type>/<bundle.name>/<bundle.release>/
-     bearsampp-mariadb-<bundleVersion>-<bundle.release>.7z
-   # Example:
-   <repo_root>/../bearsampp-build/bins/mariadb/2025.8.21/
-     bearsampp-mariadb-12.0.2-2025.8.21.7z
-   ```
-
-### Custom Build Path
-
-To use a custom build directory:
-
-```bash
-# Option 1: Set environment variable
-set BEARSAMPP_BUILD_PATH=D:/MyBuilds
-gradle build
-
-# Option 2: Edit build.properties
-# Uncomment and modify:
-# build.path = D:/MyBuilds
+Example:
+```
+bearsampp-build/bins/mariadb/2025.8.21/
+├── bearsampp-mariadb-12.0.2-2025.8.21.7z
+├── bearsampp-mariadb-12.0.2-2025.8.21.7z.md5
+├── bearsampp-mariadb-12.0.2-2025.8.21.7z.sha1
+├── bearsampp-mariadb-12.0.2-2025.8.21.7z.sha256
+└── bearsampp-mariadb-12.0.2-2025.8.21.7z.sha512
 ```
 
-### Build Process Flow (release task)
-
-```
-resolve version URL (modules-untouched → fallback)
-  ↓
-download to bearsampp-build/tmp/downloads/mariadb/
-  ↓
-extract to bearsampp-build/tmp/extract/mariadb/<version>/
-  ↓
-prepare contents under bearsampp-build/tmp/bundles_prep/bins/mariadb/mariadb<version>/
-  ↓
-copy dev/bin overlay (if present)
-  ↓
-archive to <buildBase>/<bundle.type>/<bundle.name>/<bundle.release>/
-  ↓
-generate MD5/SHA1/SHA256/SHA512 files
-```
-
-## Configuration Files
-
-The Gradle build does not modify `bearsampp.conf` files. It copies content from the source directory (local `bin/mariadb<version>` or the downloaded archive) and overlays any files present in your local `bin` folder for that version. Ensure your configuration files are already correct inside the source directory you provide.
-
-## Release Management
-
-### Creating a New Release
-
-1. Update bundle release (date) in `build.properties`:
-   ```properties
-   bundle.release = 2025.9.1
-   ```
-
-2. Add a new MariaDB version (optional):
-   - Option A: Place binaries under `bin/mariadbX.X.X/` (local build uses these)
-   - Option B: Ensure the version exists in modules-untouched `mariadb.properties` so the build can download it automatically
-
-3. Build and test:
-   ```bash
-   gradle verify
-   gradle release -PbundleVersion=12.0.2
-   ```
-
-4. **Commit and tag**:
-   ```bash
-   git add .
-   git commit -m "Release 2025.9.1"
-   git tag -a 2025.9.1 -m "Release 2025.9.1"
-   git push origin main --tags
-   ```
-
-### Version Numbering
-
-Bearsampp uses a date-based versioning scheme:
-
-```
-YYYY.M.D
-```
-
-- `YYYY`: Four-digit year
-- `M`: Month (1-12, no leading zero)
-- `D`: Day (1-31, no leading zero)
-
-Examples:
-- `2025.8.21` → August 21, 2025
-- `2025.12.1` → December 1, 2025
+---
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Java Not Found
+#### Issue: "Dev path not found"
 
-**Error**: `ERROR: JAVA_HOME is not set`
-
-**Solution**:
-```bash
-# Windows
-set JAVA_HOME=C:\Program Files\Java\jdk-17
-set PATH=%JAVA_HOME%\bin;%PATH%
-
-# Verify
-java -version
+**Symptom:**
+```
+Dev path not found: E:/Bearsampp-development/dev
 ```
 
-#### 7-Zip Not Found
+**Solution:**
+This error indicates the `dev` project is missing from the parent directory. Ensure the `dev` project exists at the expected location or adjust your workspace layout.
 
-**Error**: `Cannot run program "7z"`
+---
 
-**Solution**:
-- Install 7-Zip from https://www.7-zip.org/
-- Add to PATH: `C:\Program Files\7-Zip`
-- Verify: `7z --help`
+#### Issue: "Bundle version not found"
 
-#### Build Directory Access Denied
-
-**Error**: `Access denied` when creating build directory
-
-**Solution**:
-- Run terminal as Administrator
-- Or change `build.path` to a user-writable location
-
-#### Dev path not found
-
-The build expects a sibling `dev` directory at `<repo_root>/../dev`. If it is missing you will see:
-
+**Symptom:**
 ```
-Dev path not found: <path>.
-Please ensure the 'dev' project exists in <root>
+Bundle version not found: E:/Bearsampp-development/module-mariadb/bin/mariadb12.0.99
 ```
 
-Create the required `dev` directory or adjust your workspace layout.
+**Solution:**
+1. List available versions: `gradle listVersions`
+2. Use an existing version: `gradle release -PbundleVersion=12.0.2`
+3. Or download will be attempted from modules-untouched
+
+---
+
+#### Issue: "Failed to download from modules-untouched"
+
+**Symptom:**
+```
+Failed to download from modules-untouched: Connection refused
+```
+
+**Solution:**
+1. Check internet connectivity
+2. Verify version exists: `gradle listReleases`
+3. Check modules-untouched repository is accessible
+4. Manually download and place in `bin/mariadb{version}/`
+
+---
+
+#### Issue: "Java version too old"
+
+**Symptom:**
+```
+Java 8+ required
+```
+
+**Solution:**
+1. Check Java version: `java -version`
+2. Install Java 8 or higher
+3. Update JAVA_HOME environment variable
+
+---
+
+#### Issue: "7-Zip not found"
+
+**Symptom:**
+```
+7-Zip not found. Please install 7-Zip or set 7Z_HOME environment variable.
+```
+
+**Solution:**
+1. Install 7-Zip from https://www.7-zip.org/
+2. Add to PATH or set 7Z_HOME environment variable
+3. Verify: `7z --help`
+
+---
 
 ### Debug Mode
 
-Run Gradle with additional logging:
+Run Gradle with debug output:
 
 ```bash
-# Info level
-gradle build --info
-
-# Debug level
-gradle build --debug
-
-# Stack traces
-gradle build --stacktrace
+gradle release -PbundleVersion=12.0.2 --info
+gradle release -PbundleVersion=12.0.2 --debug
+gradle release -PbundleVersion=12.0.2 --stacktrace
 ```
 
 ### Clean Build
 
-If you encounter persistent issues:
+If you encounter issues, try a clean build:
 
 ```bash
-# Clean everything
 gradle clean
-
-# Clean Gradle cache
-gradle clean --no-daemon
-
-# Delete .gradle directory
-rm -rf .gradle
-gradle build
+gradle release -PbundleVersion=12.0.2
 ```
-
-## Contributing
-
-### Development Workflow
-
-1. **Fork the repository**
-2. **Create a feature branch**:
-   ```bash
-   git checkout -b feature/my-feature
-   ```
-3. **Make changes and test**:
-   ```bash
-   gradle clean build validate
-   ```
-4. **Commit with clear messages**:
-   ```bash
-   git commit -m "Add: New MariaDB 12.1.0 support"
-   ```
-5. **Push and create pull request**:
-   ```bash
-   git push origin feature/my-feature
-   ```
-
-### Code Style
-
-- Follow existing code formatting
-- Use `.editorconfig` settings
-- Keep `build.gradle.kts` organized and commented
-- Update documentation for any changes
-
-### Testing Checklist
-
-- [ ] `gradle clean` completes successfully
-- [ ] `gradle build` creates valid archive
-- [ ] `gradle validate` passes all checks
-- [ ] Archive extracts correctly
-- [ ] `bearsampp.conf` files have correct release version
-- [ ] Documentation is updated
-
-## Additional Resources
-
-- **Main Documentation**: [README.md](../README.md)
-- **Task Reference**: [TASKS.md](TASKS.md)
-- **Configuration Guide**: [CONFIGURATION.md](CONFIGURATION.md)
-- **Migration Guide**: [MIGRATION.md](MIGRATION.md)
-- **Bearsampp Project**: https://github.com/bearsampp/bearsampp
-- **Module Documentation**: https://bearsampp.com/module/mariadb
-- **Issue Tracker**: https://github.com/bearsampp/bearsampp/issues
-
-## License
-
-This project is licensed under the terms specified in the [LICENSE](../LICENSE) file.
 
 ---
 
-**Note**: For issues and support, please report on the [Bearsampp repository](https://github.com/bearsampp/bearsampp/issues).
+## Migration Guide
+
+### From Ant to Gradle
+
+The project has been fully migrated from Ant to Gradle. Here's what changed:
+
+#### Removed Files
+
+| File              | Status    | Replacement                |
+|-------------------|-----------|----------------------------|
+| `build.xml`       | ✗ Removed | `build.gradle`             |
+
+#### Command Mapping
+
+| Ant Command                          | Gradle Command                              |
+|--------------------------------------|---------------------------------------------|
+| `ant release`                        | `gradle release`                            |
+| `ant release -Dinput.bundle=12.0.2`  | `gradle release -PbundleVersion=12.0.2`     |
+| `ant clean`                          | `gradle clean`                              |
+
+#### Key Differences
+
+| Aspect              | Ant                          | Gradle                           |
+|---------------------|------------------------------|----------------------------------|
+| **Build File**      | XML (build.xml)              | Groovy DSL (build.gradle)        |
+| **Task Definition** | `<target name="...">`        | `tasks.register('...')`          |
+| **Properties**      | `<property name="..." />`    | `ext { ... }`                    |
+| **Dependencies**    | Manual downloads             | Automatic with repositories      |
+| **Caching**         | None                         | Built-in incremental builds      |
+| **IDE Support**     | Limited                      | Excellent (IntelliJ, Eclipse)    |
+
+#### Version Resolution Changes
+
+**Ant (Old)**:
+- Used local `releases.properties` file
+- Manual URL management
+
+**Gradle (New)**:
+- Fetches from modules-untouched `mariadb.properties`
+- Automatic fallback to standard URL format
+- Better error handling and reporting
+
+---
+
+## Additional Resources
+
+- [Gradle Documentation](https://docs.gradle.org/)
+- [Bearsampp Project](https://github.com/bearsampp/bearsampp)
+- [MariaDB Downloads](https://mariadb.org/download/)
+- [Modules Untouched Repository](https://github.com/Bearsampp/modules-untouched)
+
+---
+
+## Support
+
+For issues and questions:
+
+- **GitHub Issues**: https://github.com/bearsampp/module-mariadb/issues
+- **Bearsampp Issues**: https://github.com/bearsampp/bearsampp/issues
+- **Documentation**: https://bearsampp.com/module/mariadb
+
+---
+
+**Last Updated**: 2025-01-31  
+**Version**: 2025.8.21  
+**Build System**: Pure Gradle (no wrapper, no Ant)
+
+Notes:
+- This project deliberately does not ship the Gradle Wrapper. Install Gradle 7+ locally and run with `gradle ...`.
+- Legacy Ant files (e.g., Eclipse `.launch` referencing `build.xml`) are deprecated and not used by the build.
+- Local `releases.properties` is no longer used for version resolution. Versions are sourced from modules-untouched.

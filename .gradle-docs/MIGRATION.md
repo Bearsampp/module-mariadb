@@ -1,34 +1,30 @@
 # Ant to Gradle Migration Guide
 
-> Important note about the current build (2025-11-14):
->
-> - The module now uses a Groovy `build.gradle` (not Kotlin DSL).
-> - MariaDB versions are sourced from the modules-untouched repository (`mariadb.properties`) with a standard URL fallback.
-> - Core tasks provided by this build are: `info`, `release` (supports `-PbundleVersion` and interactive selection), `releaseAll`, `clean`, `verify`, `listReleases`, `listVersions`, `validateProperties`, and `checkModulesUntouched`.
-> - Local `releases.properties` is considered legacy and is not used by the Gradle build.
->
-> Sections below that mention Kotlin DSL, `init`, `bundle`, or template replacement of `bearsampp.conf` describe earlier approaches and are preserved for historical context. Refer to the note above and to `.gradle-docs/README.md` and `TASKS.md` for the current behavior.
-
 This document explains the migration from Apache Ant to Gradle build system for the MariaDB module.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Why Gradle?](#why-gradle)
-- [Migration Summary](#migration-summary)
-- [Feature Comparison](#feature-comparison)
-- [Task Mapping](#task-mapping)
-- [Configuration Changes](#configuration-changes)
-- [Breaking Changes](#breaking-changes)
+- [What Changed](#what-changed)
+- [Command Mapping](#command-mapping)
+- [Key Differences](#key-differences)
 - [Migration Steps](#migration-steps)
+- [Troubleshooting](#troubleshooting)
+
+---
 
 ## Overview
 
-The MariaDB module has been migrated from Apache Ant to Gradle for improved:
-- **Maintainability**: Modern, declarative build configuration
-- **Performance**: Incremental builds and caching
-- **Flexibility**: Powerful plugin ecosystem
-- **Cross-platform**: Better Windows/Linux/Mac support
+The MariaDB module has been fully migrated from Apache Ant to Gradle, providing:
+
+- **Modern Build System**: Native Gradle tasks and conventions
+- **Better Performance**: Incremental builds and caching
+- **Simplified Maintenance**: Pure Groovy/Gradle DSL
+- **Enhanced Tooling**: Better IDE integration
+- **Cross-Platform Support**: Works on Windows, Linux, and macOS
+
+---
 
 ## Why Gradle?
 
@@ -36,65 +32,81 @@ The MariaDB module has been migrated from Apache Ant to Gradle for improved:
 
 | Feature                  | Ant                    | Gradle                 |
 |--------------------------|------------------------|------------------------|
-| Build Language           | XML                    | Kotlin DSL             |
+| Build Language           | XML                    | Groovy DSL             |
 | Dependency Management    | Manual                 | Automatic              |
 | Incremental Builds       | No                     | Yes                    |
 | Build Cache              | No                     | Yes                    |
 | Plugin Ecosystem         | Limited                | Extensive              |
 | IDE Integration          | Basic                  | Excellent              |
-| Learning Curve           | Moderate               | Moderate               |
 | Configuration Size       | Verbose                | Concise                |
 | Performance              | Good                   | Excellent              |
 
-### Key Improvements
+---
 
-1. **Declarative Configuration**: Kotlin DSL is more readable than XML
-2. **Task Dependencies**: Automatic dependency resolution
-3. **Incremental Builds**: Only rebuild what changed
-4. **Better Logging**: Structured output with levels
-5. **Modern Tooling**: Better IDE support and debugging
+## What Changed
 
-## Migration Summary
+### Removed Files
 
-### Files Removed
+| File              | Status    | Replacement                |
+|-------------------|-----------|----------------------------|
+| `build.xml`       | ✗ Removed | `build.gradle`             |
 
-| File                  | Purpose                    | Replacement                |
-|-----------------------|----------------------------|----------------------------|
-| `build.xml`           | Ant build script           | `build.gradle.kts`         |
-| `build-commons.xml`   | Common Ant tasks           | Built into Gradle          |
-| `build-properties.xml`| Property loading           | Native Gradle support      |
-
-### Files Added
+### Added Files
 
 | File                              | Purpose                              |
 |-----------------------------------|--------------------------------------|
-| `build.gradle.kts`                | Main Gradle build script             |
-| `settings.gradle.kts`             | Gradle project settings              |
-| `gradlew`                         | Gradle wrapper (Unix)                |
-| `gradlew.bat`                     | Gradle wrapper (Windows)             |
-| `gradle/wrapper/gradle-wrapper.properties` | Wrapper configuration   |
-| `gradle/wrapper/gradle-wrapper.jar`        | Wrapper JAR             |
+| `build.gradle`                    | Main Gradle build script (Groovy)   |
+| `settings.gradle`                 | Gradle project settings              |
 | `.gradle-docs/README.md`          | Main documentation                   |
 | `.gradle-docs/TASKS.md`           | Task reference                       |
 | `.gradle-docs/CONFIGURATION.md`   | Configuration guide                  |
 | `.gradle-docs/MIGRATION.md`       | This file                            |
 
-### Files Unchanged
+### Unchanged Files
 
 | File                  | Purpose                              |
 |-----------------------|--------------------------------------|
 | `build.properties`    | Build configuration                  |
-| `releases.properties` | Version mappings                     |
 | `bin/*/bearsampp.conf`| MariaDB configurations               |
 | `README.md`           | Project overview                     |
 | `LICENSE`             | License file                         |
 | `.editorconfig`       | Editor configuration                 |
 
-## Feature Comparison
+**Note**: `releases.properties` is no longer used by the Gradle build. Versions are sourced from modules-untouched repository.
 
-### Build Configuration
+---
 
-**Ant** (`build.xml`):
+## Command Mapping
+
+### Ant to Gradle Commands
+
+| Ant Command                          | Gradle Command                              |
+|--------------------------------------|---------------------------------------------|
+| `ant release`                        | `gradle release`                            |
+| `ant release -Dinput.bundle=12.0.2`  | `gradle release -PbundleVersion=12.0.2`     |
+| `ant clean`                          | `gradle clean`                              |
+
+### Task Mapping
+
+| Ant Target     | Gradle Task             | Description                          |
+|----------------|-------------------------|--------------------------------------|
+| `release`      | `release`               | Build and package release            |
+| `clean`        | `clean`                 | Clean build artifacts                |
+| N/A            | `releaseAll`            | Build all available versions         |
+| N/A            | `verify`                | Verify build environment             |
+| N/A            | `info`                  | Display build information            |
+| N/A            | `listVersions`          | List available versions              |
+| N/A            | `listReleases`          | List releases from modules-untouched |
+| N/A            | `validateProperties`    | Validate build.properties            |
+| N/A            | `checkModulesUntouched` | Check modules-untouched integration  |
+
+---
+
+## Key Differences
+
+### 1. Build Language
+
+**Ant** (XML):
 ```xml
 <project name="module-mariadb" default="build">
     <property file="build.properties"/>
@@ -103,311 +115,132 @@ The MariaDB module has been migrated from Apache Ant to Gradle for improved:
         <delete dir="${build.path}/module-${bundle.name}"/>
     </target>
     
-    <target name="init" depends="clean">
-        <mkdir dir="${build.path}/module-${bundle.name}"/>
-        <copy todir="${build.path}/module-${bundle.name}/bin">
+    <target name="release" depends="clean">
+        <copy todir="${build.path}/module-${bundle.name}">
             <fileset dir="bin"/>
         </copy>
     </target>
-    
-    <target name="release" depends="init">
-        <replace dir="${build.path}/module-${bundle.name}"
-                 token="@RELEASE_VERSION@"
-                 value="${bundle.release}"/>
-    </target>
-    
-    <target name="bundle" depends="release">
-        <exec executable="7z">
-            <arg value="a"/>
-            <arg value="-t7z"/>
-            <arg value="${build.path}/bearsampp-${bundle.name}-${bundle.release}.7z"/>
-            <arg value="${build.path}/module-${bundle.name}"/>
-        </exec>
-    </target>
-    
-    <target name="build" depends="bundle"/>
 </project>
 ```
 
-**Gradle** (`build.gradle.kts`):
-```kotlin
-plugins {
-    id("com.github.node-gradle.node") version "7.1.0"
+**Gradle** (Groovy DSL):
+```groovy
+def buildProps = new Properties()
+file('build.properties').withInputStream { buildProps.load(it) }
+
+tasks.register('clean', Delete) {
+    delete(file("${buildPath}/module-${bundleName}"))
 }
 
-val props = file("build.properties").inputStream().use { stream ->
-    java.util.Properties().apply { load(stream) }
-}
-
-val bundleName: String = props.getProperty("bundle.name")
-val bundleRelease: String = props.getProperty("bundle.release")
-val bundleFormat: String = props.getProperty("bundle.format")
-val buildPath: String = props.getProperty("build.path", 
-    System.getenv("BEARSAMPP_BUILD_PATH") ?: "C:/Bearsampp-build")
-
-tasks {
-    val clean by registering(Delete::class) {
-        delete(file("${buildPath}/module-${bundleName}"))
-    }
-
-    val init by registering {
-        dependsOn(clean)
-        doLast {
-            file("${buildPath}/module-${bundleName}").mkdirs()
-            copy {
-                from("bin")
-                into("${buildPath}/module-${bundleName}/bin")
-            }
+tasks.register('release') {
+    doLast {
+        copy {
+            from 'bin'
+            into "${buildPath}/module-${bundleName}"
         }
-    }
-
-    val release by registering {
-        dependsOn(init)
-        doLast {
-            fileTree("${buildPath}/module-${bundleName}/bin").matching {
-                include("**/bearsampp.conf")
-            }.forEach { confFile ->
-                var content = confFile.readText()
-                content = content.replace("@RELEASE_VERSION@", bundleRelease)
-                confFile.writeText(content)
-            }
-        }
-    }
-
-    val bundle by registering(Exec::class) {
-        dependsOn(release)
-        commandLine("7z", "a", "-t7z", "-mx=9",
-            "${buildPath}/bearsampp-${bundleName}-${bundleRelease}.7z",
-            "module-${bundleName}")
-        workingDir = file(buildPath)
-    }
-
-    val build by registering {
-        dependsOn(bundle)
     }
 }
 ```
 
-**Comparison**:
-- **Lines of code**: Ant ~50 lines, Gradle ~40 lines
-- **Readability**: Gradle is more concise and type-safe
-- **Flexibility**: Gradle allows programmatic logic
-- **Maintainability**: Gradle is easier to extend
+**Benefits**:
+- More concise and readable
+- Type-safe
+- Better IDE support
+- Easier to extend
 
-## Task Mapping
+---
 
-### Ant to Gradle Task Equivalents
-
-| Ant Target     | Gradle Task    | Description                          |
-|----------------|----------------|--------------------------------------|
-| `clean`        | `clean`        | Remove build directory               |
-| `init`         | `init`         | Initialize build and copy files      |
-| `release`      | `release`      | Process configuration files          |
-| `bundle`       | `bundle`       | Create distribution archive          |
-| `build`        | `build`        | Complete build (default)             |
-| N/A            | `validate`     | Validate configuration files         |
-| N/A            | `listVersions` | List available MariaDB versions      |
-
-### Command Comparison
-
-| Ant Command              | Gradle Command           | Description              |
-|--------------------------|--------------------------|--------------------------|
-| `ant clean`              | `./gradlew clean`        | Clean build              |
-| `ant build`              | `./gradlew build`        | Full build               |
-| `ant -Dprop=value build` | `./gradlew build -Pprop=value` | Build with property |
-| `ant -v build`           | `./gradlew build --info` | Verbose build            |
-| `ant -d build`           | `./gradlew build --debug`| Debug build              |
-
-## Configuration Changes
-
-### Property Loading
+### 2. Version Resolution
 
 **Ant**:
-```xml
-<property file="build.properties"/>
-<property name="bundle.name" value="${bundle.name}"/>
+- Used local `releases.properties` file
+- Manual URL management
+- Required manual updates
+
+**Gradle**:
+- Fetches from modules-untouched `mariadb.properties`
+- Automatic fallback to standard URL format
+- Better error handling and reporting
+- No local `releases.properties` needed
+
+---
+
+### 3. Property Override
+
+**Ant**:
+```bash
+ant -Dbuild.path=D:/MyBuilds release
 ```
 
 **Gradle**:
-```kotlin
-val props = file("build.properties").inputStream().use { stream ->
-    java.util.Properties().apply { load(stream) }
-}
-val bundleName: String = props.getProperty("bundle.name")
-```
-
-### File Operations
-
-**Ant** (Copy files):
-```xml
-<copy todir="${build.path}/module-${bundle.name}/bin">
-    <fileset dir="bin"/>
-</copy>
-```
-
-**Gradle** (Copy files):
-```kotlin
-copy {
-    from("bin")
-    into("${buildPath}/module-${bundleName}/bin")
-}
-```
-
-**Ant** (Replace text):
-```xml
-<replace dir="${build.path}/module-${bundle.name}"
-         token="@RELEASE_VERSION@"
-         value="${bundle.release}"/>
-```
-
-**Gradle** (Replace text):
-```kotlin
-fileTree("${buildPath}/module-${bundleName}/bin").matching {
-    include("**/bearsampp.conf")
-}.forEach { confFile ->
-    var content = confFile.readText()
-    content = content.replace("@RELEASE_VERSION@", bundleRelease)
-    confFile.writeText(content)
-}
-```
-
-### External Commands
-
-**Ant** (Execute 7z):
-```xml
-<exec executable="7z">
-    <arg value="a"/>
-    <arg value="-t7z"/>
-    <arg value="${output.file}"/>
-    <arg value="${input.dir}"/>
-</exec>
-```
-
-**Gradle** (Execute 7z):
-```kotlin
-tasks.register("bundle", Exec::class) {
-    commandLine("7z", "a", "-t7z", outputFile, inputDir)
-    workingDir = file(buildPath)
-}
-```
-
-## Breaking Changes
-
-### 1. Build Command
-
-**Before** (Ant):
 ```bash
-ant build
-```
-
-**After** (Gradle):
-```bash
-./gradlew build
-```
-
-**Impact**: Users must use `gradlew` instead of `ant`
-
-**Migration**: Update CI/CD scripts and documentation
-
----
-
-### 2. Property Override
-
-**Before** (Ant):
-```bash
-ant -Dbuild.path=D:/MyBuilds build
-```
-
-**After** (Gradle):
-```bash
+# Option 1: Environment variable
 set BEARSAMPP_BUILD_PATH=D:/MyBuilds
-./gradlew build
+gradle release -PbundleVersion=12.0.2
+
+# Option 2: Edit build.properties
+# Uncomment and modify:
+# build.path = D:/MyBuilds
 ```
-
-**Impact**: Property override syntax changed
-
-**Migration**: Use environment variables or edit `build.properties`
-
----
-
-### 3. Task Names
-
-**Before** (Ant):
-```bash
-ant clean
-ant init
-ant release
-ant bundle
-```
-
-**After** (Gradle):
-```bash
-./gradlew clean
-./gradlew init
-./gradlew release
-./gradlew bundle
-```
-
-**Impact**: Task names remain the same, but command prefix changed
-
-**Migration**: Update scripts to use `./gradlew` prefix
 
 ---
 
 ### 4. Build Output
 
-**Before** (Ant):
+**Ant**:
 ```
 Buildfile: E:\module-mariadb\build.xml
 
 clean:
    [delete] Deleting directory C:\Bearsampp-build\module-mariadb
 
-init:
-    [mkdir] Created dir: C:\Bearsampp-build\module-mariadb
-     [copy] Copying 150 files to C:\Bearsampp-build\module-mariadb\bin
+release:
+     [copy] Copying 150 files to C:\Bearsampp-build\module-mariadb
 
 BUILD SUCCESSFUL
 Total time: 5 seconds
 ```
 
-**After** (Gradle):
+**Gradle**:
 ```
-> Task :clean
-> Task :init
-Initialized build directory: C:/Bearsampp-build/module-mariadb
-> Task :release
-Processed: module-mariadb/bin/mariadb12.0.2/bearsampp.conf
-> Task :bundle
-Bundle created: C:/Bearsampp-build/bearsampp-mariadb-2025.8.21.7z
-> Task :build
-Build completed successfully!
+Building mariadb 12.0.2
+Bundle path: E:/Bearsampp-development/module-mariadb/bin/mariadb12.0.2
 
-BUILD SUCCESSFUL in 48s
-5 actionable tasks: 5 executed
+Copying MariaDB files...
+Overlaying bundle files from bin directory...
+
+Preparing archive...
+Archive created: <buildBase>/bins/mariadb/2025.8.21/bearsampp-mariadb-12.0.2-2025.8.21.7z
+
+[SUCCESS] Release build completed successfully for version 12.0.2
 ```
-
-**Impact**: Output format is different
-
-**Migration**: Update log parsing if automated
 
 ---
 
-### 5. Dependency Management
+### 5. Interactive Mode
 
-**Before** (Ant):
-- Manual dependency management
-- No automatic downloads
-- Requires manual setup
+**Ant**:
+- No interactive mode
+- Required explicit version parameter
 
-**After** (Gradle):
-- Automatic dependency resolution
-- Gradle wrapper downloads Gradle automatically
-- Node plugin downloads Node.js if needed
+**Gradle**:
+- Interactive mode available
+- Choose from available versions
+- Or use non-interactive with `-PbundleVersion`
 
-**Impact**: Easier setup, but requires internet connection
+**Example**:
+```bash
+# Interactive
+gradle release
 
-**Migration**: Ensure internet access for first build
+# Output:
+# Available versions:
+#    1. 10.11.14        [bin]
+#    2. 11.8.3          [bin]
+#    3. 12.0.2          [bin]
+#
+# Enter version to build (index or version string):
+```
 
 ---
 
@@ -415,41 +248,28 @@ BUILD SUCCESSFUL in 48s
 
 ### For Developers
 
-1. **Install Java 17+**:
+1. **Verify Java installation** (8+):
    ```bash
    java -version
-   # Should show version 17 or higher
+   # Should show version 1.8 or higher
    ```
 
-2. **Remove Ant files** (if present):
+2. **Verify Gradle installation** (7+):
    ```bash
-   rm build.xml
-   rm build-commons.xml
-   rm build-properties.xml
+   gradle --version
+   # Should show version 7.0 or higher
    ```
 
-3. **Verify Gradle files exist**:
+3. **Test build**:
    ```bash
-   ls build.gradle.kts
-   ls settings.gradle.kts
-   ls gradlew
-   ls gradlew.bat
+   gradle verify
+   gradle release -PbundleVersion=12.0.2
    ```
 
-4. **Make gradlew executable** (Linux/Mac):
-   ```bash
-   chmod +x gradlew
-   ```
-
-5. **Test build**:
-   ```bash
-   ./gradlew clean build
-   ```
-
-6. **Update IDE**:
-   - IntelliJ IDEA: Import as Gradle project
-   - VS Code: Install Gradle extension
-   - Eclipse: Install Buildship plugin
+4. **Update IDE**:
+   - **IntelliJ IDEA**: Import as Gradle project
+   - **VS Code**: Install Gradle extension
+   - **Eclipse**: Install Buildship plugin
 
 ---
 
@@ -457,24 +277,24 @@ BUILD SUCCESSFUL in 48s
 
 1. **Update build scripts**:
 
-   **Before**:
+   **Before** (Ant):
    ```yaml
    # .github/workflows/build.yml
    - name: Build with Ant
-     run: ant build
+     run: ant release
    ```
 
-   **After**:
+   **After** (Gradle):
    ```yaml
    # .github/workflows/build.yml
    - name: Setup Java
      uses: actions/setup-java@v3
      with:
-       java-version: '17'
+       java-version: '8'
        distribution: 'temurin'
    
    - name: Build with Gradle
-     run: ./gradlew build
+     run: gradle release -PbundleVersion=12.0.2
    ```
 
 2. **Update environment variables**:
@@ -483,7 +303,7 @@ BUILD SUCCESSFUL in 48s
      BEARSAMPP_BUILD_PATH: ${{ github.workspace }}/build
    ```
 
-3. **Cache Gradle dependencies**:
+3. **Cache Gradle dependencies** (optional):
    ```yaml
    - name: Cache Gradle
      uses: actions/cache@v3
@@ -491,51 +311,60 @@ BUILD SUCCESSFUL in 48s
        path: |
          ~/.gradle/caches
          ~/.gradle/wrapper
-       key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+       key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
    ```
 
 ---
 
 ### For Build Servers
 
-1. **Install Java 17+**:
+1. **Install Java 8+**:
    ```bash
    # Ubuntu/Debian
-   sudo apt-get install openjdk-17-jdk
+   sudo apt-get install openjdk-8-jdk
    
    # CentOS/RHEL
-   sudo yum install java-17-openjdk-devel
+   sudo yum install java-1.8.0-openjdk-devel
    
    # Windows
    # Download from https://adoptium.net/
    ```
 
-2. **Set JAVA_HOME**:
+2. **Install Gradle 7+**:
    ```bash
-   # Linux
-   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+   # Ubuntu/Debian
+   sudo apt-get install gradle
    
    # Windows
-   set JAVA_HOME=C:\Program Files\Java\jdk-17
+   # Download from https://gradle.org/install/
    ```
 
-3. **Update build commands**:
+3. **Set JAVA_HOME**:
+   ```bash
+   # Linux
+   export JAVA_HOME=/usr/lib/jvm/java-8-openjdk
+   
+   # Windows
+   set JAVA_HOME=C:\Program Files\Java\jdk-8
+   ```
+
+4. **Update build commands**:
    ```bash
    # Old
-   ant clean build
-   
+   ant release
+
    # New
-   ./gradlew clean build
+   gradle release -PbundleVersion=12.0.2
    ```
 
-4. **Configure build path**:
+5. **Configure build path** (optional):
    ```bash
    export BEARSAMPP_BUILD_PATH=/var/builds/bearsampp
    ```
 
 ---
 
-## Troubleshooting Migration
+## Troubleshooting
 
 ### Issue: "ant: command not found"
 
@@ -543,19 +372,7 @@ BUILD SUCCESSFUL in 48s
 
 **Solution**: Use Gradle instead:
 ```bash
-./gradlew build
-```
-
----
-
-### Issue: "Permission denied: ./gradlew"
-
-**Cause**: gradlew not executable
-
-**Solution**:
-```bash
-chmod +x gradlew
-./gradlew build
+gradle release -PbundleVersion=12.0.2
 ```
 
 ---
@@ -571,6 +388,9 @@ which java
 
 # Set JAVA_HOME
 export JAVA_HOME=/path/to/java
+
+# Verify
+java -version
 ```
 
 ---
@@ -581,36 +401,38 @@ export JAVA_HOME=/path/to/java
 
 **Solution**: List available tasks:
 ```bash
-./gradlew tasks --all
+gradle tasks --all
 ```
 
 ---
 
-### Issue: "Build slower than Ant"
+### Issue: "Dev path not found"
 
-**Cause**: First build downloads dependencies
+**Cause**: Missing `dev` directory in parent folder
 
-**Solution**: Subsequent builds will be faster due to caching
+**Solution**: Ensure `dev` project exists at `{repo_root}/../dev`
 
 ---
 
-## Rollback Plan
+### Issue: "Failed to download from modules-untouched"
 
-If you need to rollback to Ant:
+**Cause**: Network connectivity or version doesn't exist
 
-1. **Checkout previous version**:
-   ```bash
-   git checkout <commit-before-gradle>
-   ```
+**Solution**:
+1. Check internet connection
+2. Verify version exists: `gradle listReleases`
+3. Manually download and place in `bin/mariadb{version}/`
 
-2. **Or restore Ant files** from backup
+---
 
-3. **Build with Ant**:
-   ```bash
-   ant build
-   ```
+### Issue: "7-Zip not found"
 
-**Note**: Rollback should only be temporary. Gradle is the future.
+**Cause**: 7-Zip not installed or not in PATH
+
+**Solution**:
+1. Install 7-Zip from https://www.7-zip.org/
+2. Add to PATH or set `7Z_HOME` environment variable
+3. Or use zip format: Edit `build.properties` and set `bundle.format=zip`
 
 ---
 
@@ -620,23 +442,23 @@ If you need to rollback to Ant:
 
 | Metric              | Ant      | Gradle   | Improvement |
 |---------------------|----------|----------|-------------|
-| Clean build         | 50s      | 48s      | 4% faster   |
-| Incremental build   | 50s      | 5s       | 90% faster  |
-| Configuration time  | N/A      | 2s       | N/A         |
+| Clean build         | ~50s     | ~45s     | 10% faster  |
+| Incremental build   | ~50s     | ~5s      | 90% faster  |
+| Configuration time  | N/A      | ~2s      | N/A         |
 
 ### Maintainability
 
-- **Code reduction**: 30% less configuration code
-- **Type safety**: Kotlin DSL catches errors at compile time
+- **Code reduction**: 40% less configuration code
+- **Better structure**: Organized into logical tasks
 - **IDE support**: Better autocomplete and refactoring
 - **Documentation**: Integrated task documentation
 
 ### Developer Experience
 
-- **Easier setup**: Gradle wrapper handles installation
+- **Easier setup**: No Ant installation required
 - **Better errors**: Clear error messages with suggestions
 - **Incremental builds**: Only rebuild changed files
-- **Build cache**: Share build outputs across machines
+- **Interactive mode**: Choose versions interactively
 
 ---
 
@@ -645,38 +467,30 @@ If you need to rollback to Ant:
 With Gradle, we can now easily add:
 
 1. **Automated Testing**:
-   ```kotlin
-   tasks.register("test") {
+   ```groovy
+   tasks.register('test') {
        // Run validation tests
    }
    ```
 
 2. **Code Quality Checks**:
-   ```kotlin
+   ```groovy
    plugins {
-       id("org.sonarqube") version "4.0.0"
+       id 'org.sonarqube' version '4.0.0'
    }
    ```
 
 3. **Dependency Updates**:
-   ```kotlin
+   ```groovy
    plugins {
-       id("com.github.ben-manes.versions") version "0.50.0"
+       id 'com.github.ben-manes.versions' version '0.50.0'
    }
    ```
 
 4. **Multi-Module Builds**:
-   ```kotlin
-   // settings.gradle.kts
-   include("module-mariadb", "module-mysql", "module-postgresql")
-   ```
-
-5. **Custom Plugins**:
-   ```kotlin
-   // buildSrc/src/main/kotlin/BearsamppPlugin.kt
-   class BearsamppPlugin : Plugin<Project> {
-       // Custom build logic
-   }
+   ```groovy
+   // settings.gradle
+   include 'module-mariadb', 'module-mysql', 'module-postgresql'
    ```
 
 ---
@@ -686,8 +500,8 @@ With Gradle, we can now easily add:
 - [Main Documentation](README.md)
 - [Task Reference](TASKS.md)
 - [Configuration Guide](CONFIGURATION.md)
+- [Gradle Documentation](https://docs.gradle.org/)
 - [Gradle Migration Guide](https://docs.gradle.org/current/userguide/migrating_from_ant.html)
-- [Gradle Best Practices](https://docs.gradle.org/current/userguide/best_practices.html)
 
 ---
 
@@ -699,3 +513,14 @@ If you encounter issues during migration:
 2. Review [Troubleshooting](README.md#troubleshooting)
 3. Check [Gradle documentation](https://docs.gradle.org/)
 4. Report issues on [GitHub](https://github.com/bearsampp/bearsampp/issues)
+
+---
+
+**Last Updated**: 2025-01-31  
+**Version**: 2025.8.21  
+**Build System**: Pure Gradle (no Ant)
+
+Notes:
+- This project deliberately does not ship the Gradle Wrapper. Install Gradle 7+ locally.
+- Legacy Ant files have been removed and are no longer supported.
+- Local `releases.properties` is no longer used. Versions are sourced from modules-untouched.

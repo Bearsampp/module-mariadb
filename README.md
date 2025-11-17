@@ -5,100 +5,63 @@
 
 This is a module of [Bearsampp project](https://github.com/bearsampp/bearsampp) involving MariaDB.
 
-## Quick Start
+## Build System
+
+This project uses **Gradle** as its build system. The legacy Ant build has been fully replaced with a modern, pure Gradle implementation.
+
+### Quick Start
+
+```bash
+# Display build information
+gradle info
+
+# List all available tasks
+gradle tasks
+
+# Verify build environment
+gradle verify
+
+# Build a release (interactive)
+gradle release
+
+# Build a specific version (non-interactive)
+gradle release -PbundleVersion=12.0.2
+
+# Clean build artifacts
+gradle clean
+```
 
 ### Prerequisites
 
-| Tool     | Version | Required | Purpose                    |
-|----------|---------|----------|----------------------------|
-| Java JDK | 17+     | Yes      | Gradle runtime             |
-| 7-Zip    | Latest  | Yes      | Archive creation           |
-| Git      | 2.0+    | Yes      | Version control            |
-
-### Building
-
-```bash
-# Clone the repository
-git clone https://github.com/bearsampp/module-mariadb.git
-cd module-mariadb
-
-# Build the module
-gradle build
-
-# Output: C:/Bearsampp-build/bearsampp-mariadb-2025.8.21.7z
-```
+| Requirement       | Version       | Purpose                                  |
+|-------------------|---------------|------------------------------------------|
+| **Java**          | 8+            | Required for Gradle execution            |
+| **Gradle**        | 7.0+          | Build automation tool                    |
+| **7-Zip**         | Latest        | Archive creation (required for 7z)       |
 
 ### Available Tasks
 
-| Task           | Description                          |
-|----------------|--------------------------------------|
-| `build`        | Complete build (default)             |
-| `clean`        | Remove build directory               |
-| `validate`     | Validate configuration files         |
-| `listVersions` | List available MariaDB versions      |
+| Task                      | Description                                      |
+|---------------------------|--------------------------------------------------|
+| `release`                 | Build release package (interactive/non-interactive) |
+| `releaseAll`              | Build all available versions                     |
+| `clean`                   | Clean build artifacts and temporary files        |
+| `verify`                  | Verify build environment and dependencies        |
+| `info`                    | Display build configuration information          |
+| `listVersions`            | List available bundle versions in bin/           |
+| `listReleases`            | List releases from modules-untouched             |
+| `validateProperties`      | Validate build.properties configuration          |
+| `checkModulesUntouched`   | Check modules-untouched integration              |
+
+For complete documentation, see [.gradle-docs/README.md](.gradle-docs/README.md)
 
 ## Documentation
 
-### Build System
-
-- **[Gradle Build Documentation](.gradle-docs/README.md)** - Complete build system guide
-- **[Task Reference](.gradle-docs/TASKS.md)** - Detailed task documentation
-- **[Configuration Guide](.gradle-docs/CONFIGURATION.md)** - Configuration options
-- **[Migration Guide](.gradle-docs/MIGRATION.md)** - Ant to Gradle migration
-
-### Module Information
-
-- **Official Documentation**: https://bearsampp.com/module/mariadb
-- **Downloads**: https://github.com/bearsampp/module-mariadb/releases
-
-## Project Structure
-
-```
-module-mariadb/
-├── .gradle-docs/          # Build documentation
-├── bin/                   # MariaDB binaries by version
-│   ├── mariadb10.11.14/
-│   ├── mariadb11.8.3/
-│   └── mariadb12.0.2/
-├── build.gradle           # Gradle build script (Groovy)
-├── build.properties       # Build configuration
-├── settings.gradle        # Gradle settings
-└── releases.properties    # Version mappings
-```
-
-## Configuration
-
-### build.properties
-
-```properties
-bundle.name = mariadb
-bundle.release = 2025.8.21
-bundle.type = bins
-bundle.format = 7z
-
-#build.path = C:/Bearsampp-build
-```
-
-### Environment Variables
-
-| Variable                | Default Value        | Description              |
-|-------------------------|----------------------|--------------------------|
-| `BEARSAMPP_BUILD_PATH`  | `C:/Bearsampp-build` | Build output directory   |
-| `JAVA_HOME`             | (required)           | Java installation path   |
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Make changes and test: `gradle clean build validate`
-4. Commit: `git commit -m "Add: Description"`
-5. Push: `git push origin feature/my-feature`
-6. Create a Pull Request
+- **Build Documentation**: [.gradle-docs/README.md](.gradle-docs/README.md)
+- **Task Reference**: [.gradle-docs/TASKS.md](.gradle-docs/TASKS.md)
+- **Configuration Guide**: [.gradle-docs/CONFIGURATION.md](.gradle-docs/CONFIGURATION.md)
+- **Module Downloads**: https://bearsampp.com/module/mariadb
 
 ## Issues
 
 Issues must be reported on [Bearsampp repository](https://github.com/bearsampp/bearsampp/issues).
-
-## License
-
-See [LICENSE](LICENSE) file for details.

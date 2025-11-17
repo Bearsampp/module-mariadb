@@ -1,535 +1,516 @@
 # Gradle Tasks Reference
 
-This document describes the tasks implemented in the current Groovy `build.gradle` for the MariaDB module. The build focuses on packaging MariaDB versions and sourcing binaries from the modules-untouched repository.
+This document describes all available Gradle tasks for the MariaDB module build system.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Tasks](#tasks)
-  - [info](#info)
-  - [release](#release)
-  - [releaseAll](#releaseall)
-  - [clean](#clean)
-  - [verify](#verify)
-  - [listReleases](#listreleases)
-  - [listVersions](#listversions)
-  - [validateProperties](#validateproperties)
-  - [checkModulesUntouched](#checkmodulesuntouched)
-- [Examples](#examples)
-- [Outputs and Paths](#outputs-and-paths)
-
-## Overview
-
-Key characteristics of this build:
-- Version sources: modules-untouched `mariadb.properties` with fallback URL construction
-- Local overlay: files under `bin/mariadb<version>` are overlaid on downloaded contents
-- Temporary working dirs under shared `<buildBase>/tmp`
-- Packaging to 7z (default) or zip, plus hash files
-
-## Tasks
-
-### info
-
-Display build configuration (paths, Java/Gradle, bundle properties).
-
-Usage:
-```bash
-gradle info
-```
-
-Output: human-readable summary of configuration and environment.
+- [Core Build Tasks](#core-build-tasks)
+- [Verification Tasks](#verification-tasks)
+- [Information Tasks](#information-tasks)
+- [Task Examples](#task-examples)
+- [Task Options](#task-options)
 
 ---
 
+## Overview
+
+The MariaDB module build system provides tasks organized into three main groups:
+
+| Group            | Purpose                                          |
+|------------------|--------------------------------------------------|
+| **build**        | Build and package tasks                          |
+| **verification** | Verification and validation tasks                |
+| **help**         | Help and information tasks                       |
+
+---
+
+## Core Build Tasks
+
 ### release
 
-Build a release package for a specific MariaDB version.
+Build and package a release for a specific MariaDB version.
 
-Usage (non-interactive):
+**Group**: build
+
+**Usage**:
 ```bash
+# Non-interactive (specify version)
 gradle release -PbundleVersion=12.0.2
-```
 
-Usage (interactive):
-```bash
+# Interactive (choose from available versions)
 gradle release
 ```
-The interactive mode lists versions found under `bin/` and `bin/archived/` and lets you pick by index or exact version.
 
-Behavior:
-1. Resolve download URL from modules-untouched (or fallback format)
-2. Download archive to `<buildBase>/tmp/downloads/mariadb/`
-3. Extract to `<buildBase>/tmp/extract/mariadb/<version>/`
-4. Find extracted MariaDB root folder (contains `bin/mysqld.exe`)
-5. Prepare under `<buildBase>/tmp/bundles_prep/bins/mariadb/mariadb<version>/`
-6. Overlay files from local `bin/mariadb<version>` if present
-7. Package to `<buildBase>/<bundle.type>/<bundle.name>/<bundle.release>/`
-8. Generate MD5/SHA1/SHA256/SHA512 files
+**What it does**:
+1. Validates environment and version
+2. Checks if binaries exist locally in `bin/mariadb{version}/`
+3. If not found, downloads from modules-untouched:
+   - Fetches `mariadb.properties` from modules-untouched
+   - Downloads MariaDB archive
+   - Extracts to `tmp/extract/mariadb/{version}/`
+4. Prepares bundle in `tmp/bundles_prep/bins/mariadb/mariadb{version}/`
+5. Overlays files from local `bin/mariadb{version}/` if present
+6. Copies to `tmp/bundles_build/bins/mariadb/mariadb{version}/`
+7. Creates archive in `{buildBase}/bins/mariadb/{bundle.release}/`
+8. Generates hash files (MD5, SHA1, SHA256, SHA512)
 
-Requirements:
+**Requirements**:
 - Java 8+
-- 7-Zip installed (for 7z format) or switch to `bundle.format=zip`
+- 7-Zip (for 7z format) or use `bundle.format=zip`
+- Internet connection (if downloading from modules-untouched)
+
+**Output**:
+```
+Building mariadb 12.0.2
+Bundle path: E:/Bearsampp-development/module-mariadb/bin/mariadb12.0.2
+
+Copying MariaDB files...
+Overlaying bundle files from bin directory...
+
+Copying to bundles_build directory...
+Non-zip version available at: <buildBase>/tmp/bundles_build/bins/mariadb/mariadb12.0.2
+
+Preparing archive...
+Compressing mariadb12.0.2 to bearsampp-mariadb-12.0.2-2025.8.21.7z...
+Archive created: <buildBase>/bins/mariadb/2025.8.21/bearsampp-mariadb-12.0.2-2025.8.21.7z
+Generating hash files...
+  Created: bearsampp-mariadb-12.0.2-2025.8.21.7z.md5
+  Created: bearsampp-mariadb-12.0.2-2025.8.21.7z.sha1
+  Created: bearsampp-mariadb-12.0.2-2025.8.21.7z.sha256
+  Created: bearsampp-mariadb-12.0.2-2025.8.21.7z.sha512
+
+[SUCCESS] Release build completed successfully for version 12.0.2
+```
 
 ---
 
 ### releaseAll
 
-Prepare all locally available versions (found under `bin/` and `bin/archived/`). This task copies files to the prep location but does not create release archives.
+Build all available versions found in `bin/` and `bin/archived/` directories.
 
-Usage:
+**Group**: build
+
+**Usage**:
 ```bash
 gradle releaseAll
+```
+
+**What it does**:
+1. Scans `bin/` and `bin/archived/` for all MariaDB versions
+2. Prepares each version (copies to prep directory)
+3. Reports success/failure for each version
+4. Provides summary of results
+
+**Note**: This task only prepares versions (copies files), it does not create archives.
+
+**Output**:
+```
+Building releases for 15 mariadb versions
+
+[1/15] Building mariadb 10.11.14...
+[SUCCESS] mariadb 10.11.14 completed
+
+[2/15] Building mariadb 11.8.3...
+[SUCCESS] mariadb 11.8.3 completed
+
+...
+
+Build Summary
+Total versions: 15
+Successful:     15
+Failed:         0
+
+[SUCCESS] All versions built successfully!
 ```
 
 ---
 
 ### clean
 
-Clean Gradle's local `./build` directory used by tasks; does not remove the shared `<buildBase>`.
+Clean build artifacts and temporary files.
 
-Usage:
+**Group**: build
+
+**Usage**:
 ```bash
 gradle clean
 ```
 
+**What it does**:
+- Removes local `build/` directory
+- Does not remove shared `bearsampp-build/` directory
+
+**Output**:
+```
+[SUCCESS] Build artifacts cleaned
+```
+
 ---
+
+## Verification Tasks
 
 ### verify
 
-Verify the environment is ready for building.
+Verify build environment and dependencies.
 
-Checks:
-- Java 8+
-- `build.properties` exists
-- `dev` directory exists at `<repo_root>/../dev`
-- `bin/` directory exists
-- 7-Zip installed when `bundle.format=7z`
+**Group**: verification
 
-Usage:
+**Usage**:
 ```bash
 gradle verify
 ```
 
----
+**What it checks**:
+- Java version (8+)
+- `build.properties` exists
+- `dev` directory exists
+- `bin` directory exists
+- 7-Zip installed (when `bundle.format=7z`)
 
-### listReleases
-
-List available versions from the remote modules-untouched `mariadb.properties`.
-
-Usage:
-```bash
-gradle listReleases
+**Output**:
 ```
+Verifying build environment for module-mariadb...
 
----
+Environment Check Results:
+------------------------------------------------------------
+  [PASS]     Java 8+
+  [PASS]     build.properties
+  [PASS]     dev directory
+  [PASS]     bin directory
+  [PASS]     7-Zip
+------------------------------------------------------------
 
-### listVersions
+[SUCCESS] All checks passed! Build environment is ready.
 
-List versions available locally under `bin/` and `bin/archived/`.
-
-Usage:
-```bash
-gradle listVersions
+You can now run:
+  gradle release -PbundleVersion=12.0.2   - Build release for version
+  gradle listVersions                     - List available versions
 ```
 
 ---
 
 ### validateProperties
 
-Validate required keys in `build.properties` (`bundle.name`, `bundle.release`, `bundle.type`, `bundle.format`).
+Validate `build.properties` configuration.
 
-Usage:
+**Group**: verification
+
+**Usage**:
 ```bash
 gradle validateProperties
+```
+
+**What it validates**:
+- Required properties exist:
+  - `bundle.name`
+  - `bundle.release`
+  - `bundle.type`
+  - `bundle.format`
+- Properties are not empty
+
+**Output**:
+```
+Validating build.properties...
+[SUCCESS] All required properties are present:
+    bundle.name = mariadb
+    bundle.release = 2025.8.21
+    bundle.type = bins
+    bundle.format = 7z
+```
+
+---
+
+## Information Tasks
+
+### info
+
+Display build configuration information.
+
+**Group**: help
+
+**Usage**:
+```bash
+gradle info
+```
+
+**What it shows**:
+- Project information (name, version, description)
+- Bundle properties (name, release, type, format)
+- Paths (project, root, dev, build, temp directories)
+- Java information (version, home)
+- Gradle information (version, home)
+- Available task groups
+- Quick start commands
+
+**Output**:
+```
+================================================================
+          Bearsampp Module MariaDB - Build Info
+================================================================
+
+Project:        module-mariadb
+Version:        2025.8.21
+Description:    Bearsampp Module - mariadb
+
+Bundle Properties:
+  Name:         mariadb
+  Release:      2025.8.21
+  Type:         bins
+  Format:       7z
+
+Paths:
+  Project Dir:  E:/Bearsampp-development/module-mariadb
+  Root Dir:     E:/Bearsampp-development
+  Dev Path:     E:/Bearsampp-development/dev
+  Build Base:   E:/Bearsampp-development/bearsampp-build
+  ...
+
+Java:
+  Version:      17
+  Home:         C:/Program Files/Java/jdk-17
+
+Gradle:
+  Version:      8.5
+  Home:         C:/Gradle/gradle-8.5
+
+Available Task Groups:
+  * build        - Build and package tasks
+  * help         - Help and information tasks
+  * verification - Verification tasks
+
+Quick Start:
+  gradle tasks                              - List all available tasks
+  gradle info                               - Show this information
+  gradle release -PbundleVersion=12.0.2     - Build specific version
+  gradle releaseAll                         - Build all versions
+  gradle clean                              - Clean build artifacts
+  gradle verify                             - Verify build environment
+```
+
+---
+
+### listVersions
+
+List available bundle versions in `bin/` and `bin/archived/` directories.
+
+**Group**: help
+
+**Usage**:
+```bash
+gradle listVersions
+```
+
+**Output**:
+```
+Available mariadb versions:
+------------------------------------------------------------
+  10.11.14        [bin]
+  11.8.3          [bin]
+  12.0.2          [bin]
+  10.4.27         [bin/archived]
+  10.5.18         [bin/archived]
+------------------------------------------------------------
+Total versions: 5
+
+To build a specific version:
+  gradle release -PbundleVersion=12.0.2
+```
+
+---
+
+### listReleases
+
+List all available releases from modules-untouched `mariadb.properties`.
+
+**Group**: help
+
+**Usage**:
+```bash
+gradle listReleases
+```
+
+**What it does**:
+- Fetches `mariadb.properties` from modules-untouched repository
+- Lists all available versions with download URLs
+
+**Output**:
+```
+Fetching mariadb.properties from modules-untouched repository...
+  URL: https://raw.githubusercontent.com/Bearsampp/modules-untouched/main/modules/mariadb.properties
+  ✓ Successfully loaded 25 versions from modules-untouched
+
+Available MariaDB Releases (modules-untouched):
+--------------------------------------------------------------------------------
+  10.11.14   -> https://github.com/Bearsampp/modules-untouched/releases/...
+  11.8.3     -> https://github.com/Bearsampp/modules-untouched/releases/...
+  12.0.2     -> https://github.com/Bearsampp/modules-untouched/releases/...
+  ...
+--------------------------------------------------------------------------------
+Total releases: 25
 ```
 
 ---
 
 ### checkModulesUntouched
 
-Verify connectivity to modules-untouched and display available versions plus the version resolution strategy.
+Check modules-untouched repository integration and available versions.
 
-Usage:
+**Group**: verification
+
+**Usage**:
 ```bash
 gradle checkModulesUntouched
 ```
 
-## Examples
-
-```bash
-# Show build info
-gradle info
-
-# Build a specific version
-gradle release -PbundleVersion=12.0.2
-
-# Interactive selection
-gradle release
-
-# Prepare all versions (no archive)
-gradle releaseAll
-
-# Verify environment
-gradle verify
-
-# List remote and local versions
-gradle listReleases
-gradle listVersions
-```
-
-## Outputs and Paths
-
-- Build base path priority:
-  1) `build.path` in `build.properties`
-  2) `BEARSAMPP_BUILD_PATH` environment variable
-  3) Default: `<repo_root>/../bearsampp-build`
-
-- Temporary directories:
-  - Downloads: `<buildBase>/tmp/downloads/mariadb/`
-  - Extract: `<buildBase>/tmp/extract/mariadb/<version>/`
-  - Prep: `<buildBase>/tmp/bundles_prep/bins/mariadb/mariadb<version>/`
-  - Build (copy): `<buildBase>/tmp/bundles_build/bins/mariadb/mariadb<version>/`
-
-- Archives and hashes:
-  - `<buildBase>/<bundle.type>/<bundle.name>/<bundle.release>/bearsampp-mariadb-<version>-<bundle.release>.<7z|zip>`
-  - Hash files: `.md5`, `.sha1`, `.sha256`, `.sha512`
-
-**Output**:
-```
-> Task :release
-Processed: module-mariadb/bin/mariadb10.11.14/bearsampp.conf
-Processed: module-mariadb/bin/mariadb11.8.3/bearsampp.conf
-Processed: module-mariadb/bin/mariadb12.0.2/bearsampp.conf
-BUILD SUCCESSFUL in 3s
-3 actionable tasks: 3 executed
-```
-
----
-
-### bundle
-
-**Description**: Creates a compressed archive (7z or zip) of the module.
-
-**Dependencies**: `release`
-
-**Usage**:
-```bash
-./gradlew bundle
-```
-
 **What it does**:
-1. Compresses the prepared version folder `mariadb<version>`
-2. Creates archive with naming: `bearsampp-mariadb-${version}-${bundle.release}.${format}`
-3. Ensures the archive root contains the folder `mariadb<version>` (e.g., `mariadb11.8.3`) and all files are inside it
-4. Uses optimal compression settings
-5. Reports file size
-
-**Compression settings**:
-
-**7z format**:
-```
--t7z           # 7z archive type
--m0=lzma2      # LZMA2 compression method
--mx=9          # Maximum compression level
--mfb=64        # Fast bytes: 64
--md=32m        # Dictionary size: 32MB
--ms=on         # Solid archive
-```
-
-**zip format**:
-```
--tzip          # ZIP archive type
--mx=9          # Maximum compression level
-```
+- Verifies connectivity to modules-untouched repository
+- Fetches and displays available versions
+- Shows version resolution strategy
 
 **Output**:
 ```
-> Task :bundle
-Bundle created: C:/Bearsampp-build/bearsampp-mariadb-2025.8.21.7z
-Bundle size: 245 MB
-BUILD SUCCESSFUL in 45s
-4 actionable tasks: 4 executed
-```
+======================================================================
+Modules-Untouched Integration Check
+======================================================================
 
----
+Repository URL:
+  https://raw.githubusercontent.com/Bearsampp/modules-untouched/main/modules/mariadb.properties
 
-### build
+Fetching mariadb.properties from modules-untouched...
+  ✓ Successfully loaded 25 versions from modules-untouched
 
-**Description**: Executes the complete build process (default task).
-
-**Dependencies**: `bundle`
-
-**Usage**:
-```bash
-./gradlew build
-# or simply
-./gradlew
-```
-
-**What it does**:
-1. Runs all build tasks in sequence
-2. Creates final distribution archive
-3. Reports build summary
-
-**Output**:
-```
-> Task :clean
-> Task :init
-Initialized build directory: C:/Bearsampp-build/module-mariadb
-> Task :release
-Processed: module-mariadb/bin/mariadb10.11.14/bearsampp.conf
-Processed: module-mariadb/bin/mariadb11.8.3/bearsampp.conf
-Processed: module-mariadb/bin/mariadb12.0.2/bearsampp.conf
-> Task :bundle
-Bundle created: C:/Bearsampp-build/bearsampp-mariadb-2025.8.21.7z
-Bundle size: 245 MB
-> Task :build
-Build completed successfully!
-Bundle: bearsampp-mariadb-2025.8.21.7z
-BUILD SUCCESSFUL in 48s
-5 actionable tasks: 5 executed
-```
-
----
-
-## Utility Tasks
-
-### validate
-
-**Description**: Validates configuration files for correctness.
-
-**Dependencies**: None
-
-**Usage**:
-```bash
-./gradlew validate
-```
-
-**What it validates**:
-1. `bin/` directory exists
-2. All `bearsampp.conf` files contain required properties:
-   - `mariadbVersion`
-   - `bundleRelease`
-3. Configuration syntax is correct
-
-**Success output**:
-```
-> Task :validate
-✓ All configuration files are valid
-BUILD SUCCESSFUL in 1s
-1 actionable task: 1 executed
-```
-
-**Failure output**:
-```
-> Task :validate FAILED
-ERROR: bin/mariadb12.0.2/bearsampp.conf missing mariadbVersion
-
-FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':validate'.
-> Configuration validation failed
-```
-
-**When to use**:
-- Before committing changes
-- After adding new MariaDB versions
-- When troubleshooting build issues
-- As part of CI/CD pipeline
-
----
-
-### listVersions
-
-**Description**: Lists all available MariaDB versions from `releases.properties`.
-
-**Dependencies**: None
-
-**Usage**:
-```bash
-./gradlew listVersions
-```
-
-**Output**:
-```
-> Task :listVersions
-Available MariaDB versions:
-  - 10.3.37
-  - 10.4.27
-  - 10.4.30
-  - 10.4.33
-  - 10.4.34
-  - 10.5.18
-  - 10.5.21
+======================================================================
+Available Versions in modules-untouched
+======================================================================
+  10.11.14
+  11.8.3
+  12.0.2
   ...
-  - 11.8.2
-  - 11.8.3
-  - 12.0.2
-BUILD SUCCESSFUL in 1s
-1 actionable task: 1 executed
-```
+======================================================================
+Total versions: 25
 
-**When to use**:
-- To check available versions
-- Before adding a new version
-- For documentation purposes
-- To verify `releases.properties` is correct
+======================================================================
+[SUCCESS] modules-untouched integration is working
+======================================================================
 
----
-
-## Task Dependencies
-
-### Dependency Graph
-
-```
-build
-  └── bundle
-       └── release
-            └── init
-                 └── clean
-
-validate (independent)
-listVersions (independent)
-```
-
-### Execution Order
-
-When you run `./gradlew build`, tasks execute in this order:
-
-1. `clean` - Remove old build artifacts
-2. `init` - Copy files to build directory
-3. `release` - Process configuration files
-4. `bundle` - Create archive
-5. `build` - Final summary
-
-### Skipping Dependencies
-
-You can run tasks independently:
-
-```bash
-# Run only release (will still run init and clean)
-./gradlew release
-
-# Run only bundle (will run all prerequisites)
-./gradlew bundle
-
-# Run validate independently
-./gradlew validate
+Version Resolution Strategy:
+  1. Check modules-untouched mariadb.properties (remote)
+  2. Construct standard URL format (fallback)
 ```
 
 ---
 
 ## Task Examples
 
-### Example 1: Clean Build
+### Example 1: Complete Build Workflow
 
 ```bash
-# Complete clean build
-./gradlew clean build
+# 1. Verify environment
+gradle verify
 
-# Output shows all tasks
-> Task :clean
-> Task :init
-> Task :release
-> Task :bundle
-> Task :build
-BUILD SUCCESSFUL in 50s
+# 2. List available versions
+gradle listVersions
+
+# 3. Build specific version
+gradle release -PbundleVersion=12.0.2
+
+# 4. Verify output
+ls bearsampp-build/bins/mariadb/2025.8.21/
 ```
 
 ---
 
-### Example 2: Validate Before Build
+### Example 2: Interactive Build
 
 ```bash
-# Validate first
-./gradlew validate
+# Start interactive mode
+gradle release
 
-# If successful, build
-./gradlew build
+# Output:
+# ======================================================================
+# Interactive Release Mode
+# ======================================================================
+#
+# Available versions:
+#    1. 10.11.14        [bin]
+#    2. 11.8.3          [bin]
+#    3. 12.0.2          [bin]
+#
+# Enter version to build (index or version string):
+
+# Enter: 3
+# or
+# Enter: 12.0.2
 ```
 
 ---
 
-### Example 3: Build with Custom Path
+### Example 3: Build All Versions
 
 ```bash
-# Set custom build path
-set BEARSAMPP_BUILD_PATH=D:/MyBuilds
+# Prepare all versions
+gradle releaseAll
 
-# Build
-./gradlew build
-
-# Output will use custom path
-Bundle created: D:/MyBuilds/bearsampp-mariadb-2025.8.21.7z
+# Check prepared versions
+ls bearsampp-build/tmp/bundles_prep/bins/mariadb/
 ```
 
 ---
 
-### Example 4: Debug Build Issues
+### Example 4: Debugging
 
 ```bash
-# Run with debug output
-./gradlew build --debug
+# Run with info logging
+gradle release -PbundleVersion=12.0.2 --info
 
-# Or with info level
-./gradlew build --info
+# Run with debug logging
+gradle release -PbundleVersion=12.0.2 --debug
 
-# Or with stack traces
-./gradlew build --stacktrace
+# Run with stack traces
+gradle release -PbundleVersion=12.0.2 --stacktrace
 ```
 
 ---
 
-### Example 5: Parallel Execution
+### Example 5: Clean Build
 
 ```bash
-# Run multiple tasks
-./gradlew clean validate build
-
-# Tasks run in optimal order
-> Task :clean
-> Task :validate
-> Task :init
-> Task :release
-> Task :bundle
-> Task :build
+# Clean and build
+gradle clean
+gradle release -PbundleVersion=12.0.2
 ```
 
 ---
 
-### Example 6: Dry Run
+### Example 6: Check Remote Versions
 
 ```bash
-# See what would be executed
-./gradlew build --dry-run
+# List remote versions
+gradle listReleases
 
-# Output shows task order without execution
-:clean SKIPPED
-:init SKIPPED
-:release SKIPPED
-:bundle SKIPPED
-:build SKIPPED
+# Check integration
+gradle checkModulesUntouched
+
+# List local versions
+gradle listVersions
 ```
 
 ---
 
-## Custom Task Options
+## Task Options
 
 ### Gradle Command-Line Options
 
 | Option              | Description                              | Example                          |
 |---------------------|------------------------------------------|----------------------------------|
-| `--info`            | Info level logging                       | `./gradlew build --info`         |
-| `--debug`           | Debug level logging                      | `./gradlew build --debug`        |
-| `--stacktrace`      | Show stack traces on errors              | `./gradlew build --stacktrace`   |
-| `--dry-run`         | Show tasks without executing             | `./gradlew build --dry-run`      |
-| `--no-daemon`       | Don't use Gradle daemon                  | `./gradlew build --no-daemon`    |
-| `--refresh-dependencies` | Force refresh of dependencies       | `./gradlew build --refresh-dependencies` |
-| `--parallel`        | Execute tasks in parallel                | `./gradlew build --parallel`     |
-| `--max-workers=N`   | Set maximum worker threads               | `./gradlew build --max-workers=4`|
-| `--console=plain`   | Plain console output                     | `./gradlew build --console=plain`|
-| `--quiet`           | Quiet output (errors only)               | `./gradlew build --quiet`        |
+| `--info`            | Info level logging                       | `gradle release --info`          |
+| `--debug`           | Debug level logging                      | `gradle release --debug`         |
+| `--stacktrace`      | Show stack traces on errors              | `gradle release --stacktrace`    |
+| `--dry-run`         | Show tasks without executing             | `gradle release --dry-run`       |
+| `--no-daemon`       | Don't use Gradle daemon                  | `gradle release --no-daemon`     |
+| `--console=plain`   | Plain console output                     | `gradle release --console=plain` |
+| `--quiet`           | Quiet output (errors only)               | `gradle release --quiet`         |
 
 ---
 
@@ -539,38 +520,16 @@ Bundle created: D:/MyBuilds/bearsampp-mariadb-2025.8.21.7z
 |---------------------------|--------------------------------|----------------------------------|
 | `BEARSAMPP_BUILD_PATH`    | Custom build directory         | `set BEARSAMPP_BUILD_PATH=D:/Build` |
 | `JAVA_HOME`               | Java installation directory    | `set JAVA_HOME=C:/Java/jdk-17`   |
+| `7Z_HOME`                 | 7-Zip installation directory   | `set 7Z_HOME=C:/Program Files/7-Zip` |
 | `GRADLE_OPTS`             | JVM options for Gradle         | `set GRADLE_OPTS=-Xmx2g`         |
-| `GRADLE_USER_HOME`        | Gradle user home directory     | `set GRADLE_USER_HOME=D:/.gradle`|
 
 ---
 
-### Task Configuration
+### Project Properties
 
-You can modify task behavior by editing `build.gradle.kts`:
-
-```kotlin
-// Change compression level
-tasks.bundle {
-    // Modify 7z command arguments
-}
-
-// Add custom validation
-tasks.validate {
-    doLast {
-        // Custom validation logic
-    }
-}
-
-// Add pre/post build hooks
-tasks.build {
-    doFirst {
-        println("Starting build...")
-    }
-    doLast {
-        println("Build complete!")
-    }
-}
-```
+| Property          | Description                    | Example                          |
+|-------------------|--------------------------------|----------------------------------|
+| `bundleVersion`   | Version to build               | `-PbundleVersion=12.0.2`         |
 
 ---
 
@@ -578,83 +537,64 @@ tasks.build {
 
 ### Typical Execution Times
 
-| Task       | Duration | Notes                              |
-|------------|----------|------------------------------------|
-| `clean`    | 1-2s     | Fast, just deletes directory       |
-| `init`     | 2-5s     | Depends on file count/size         |
-| `release`  | 1-2s     | Fast, text replacement only        |
-| `bundle`   | 30-60s   | Depends on compression & file size |
-| `build`    | 35-70s   | Total of all tasks                 |
-| `validate` | 1s       | Fast, just reads config files      |
-
-### Optimization Tips
-
-1. **Use Gradle Daemon** (default):
-   - Keeps Gradle in memory
-   - Faster subsequent builds
-   - Disable with `--no-daemon` if needed
-
-2. **Incremental Builds**:
-   - Gradle caches task outputs
-   - Only reruns changed tasks
-   - Use `clean` to force full rebuild
-
-3. **Parallel Execution**:
-   ```bash
-   ./gradlew build --parallel
-   ```
-
-4. **Increase Memory**:
-   ```bash
-   set GRADLE_OPTS=-Xmx4g
-   ./gradlew build
-   ```
+| Task                    | Duration | Notes                              |
+|-------------------------|----------|------------------------------------|
+| `info`                  | <1s      | Fast, just displays information    |
+| `verify`                | 1-2s     | Fast, checks environment           |
+| `listVersions`          | <1s      | Fast, scans directories            |
+| `listReleases`          | 2-5s     | Depends on network speed           |
+| `validateProperties`    | <1s      | Fast, validates config             |
+| `checkModulesUntouched` | 2-5s     | Depends on network speed           |
+| `release` (cached)      | 5-10s    | When binaries already downloaded   |
+| `release` (download)    | 30-120s  | Depends on download speed          |
+| `releaseAll`            | 1-5min   | Depends on number of versions      |
+| `clean`                 | 1-2s     | Fast, just deletes directory       |
 
 ---
 
-## Troubleshooting Tasks
+## Troubleshooting
 
 ### Task Not Found
 
 **Error**: `Task 'xyz' not found`
 
-**Solution**: Check available tasks:
+**Solution**: List available tasks:
 ```bash
-./gradlew tasks --all
+gradle tasks --all
 ```
 
 ---
 
 ### Task Failed
 
-**Error**: `Task ':bundle' FAILED`
+**Error**: `Task ':release' FAILED`
 
 **Solution**: Run with stack trace:
 ```bash
-./gradlew bundle --stacktrace
+gradle release -PbundleVersion=12.0.2 --stacktrace
 ```
 
 ---
 
-### Task Skipped
+### Download Failed
 
-**Output**: `:bundle UP-TO-DATE`
+**Error**: `Failed to download from modules-untouched`
 
-**Reason**: Task output hasn't changed
-
-**Solution**: Force re-run:
-```bash
-./gradlew clean bundle
-```
+**Solution**:
+1. Check internet connection
+2. Verify version exists: `gradle listReleases`
+3. Try again with debug logging: `gradle release --debug`
 
 ---
 
-### Slow Task Execution
+### 7-Zip Not Found
 
-**Solution**: Enable parallel execution:
-```bash
-./gradlew build --parallel --max-workers=4
-```
+**Error**: `7-Zip not found`
+
+**Solution**:
+1. Install 7-Zip from https://www.7-zip.org/
+2. Add to PATH or set `7Z_HOME` environment variable
+3. Or use zip format: Edit `build.properties` and set `bundle.format=zip`
 
 ---
 
@@ -662,5 +602,4 @@ tasks.build {
 
 - [Main Documentation](README.md)
 - [Configuration Guide](CONFIGURATION.md)
-- [Migration Guide](MIGRATION.md)
 - [Gradle Documentation](https://docs.gradle.org/)
