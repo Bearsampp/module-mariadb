@@ -1,17 +1,35 @@
-# Jetbrains
-/*.iml
-/.idea
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
 
-# Bearsampp
-/.dev
-
-# Visual Studio
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
 .vscode/
-.vs/
-.vsc/
+*.code-workspace
 
-# ignore "current" directories
-/**/current
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
 
-# Qodo
-/.qodo
+# Build output
+*.7z
+*.zip
+dist/
+
+# Node
+node_modules/
+.npm/
+.nodejs/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
