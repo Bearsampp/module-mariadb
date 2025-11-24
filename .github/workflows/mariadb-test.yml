@@ -39,7 +39,7 @@ jobs:
         run: |
           set -e
           
-          echo "=== Detecting MariaDB Versions to Test ==="
+          echo "=== Smart Version Detection for PR Testing ==="
           
           # Function to get versions from releases.properties
           get_all_versions() {
@@ -55,9 +55,11 @@ jobs:
           # Initialize variables
           VERSIONS=""
           HAS_CHANGES="false"
+          DETECTION_METHOD=""
           
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Trigger: Manual workflow dispatch"
+            DETECTION_METHOD="manual"
             
             if [ "${{ github.event.inputs.test_mode }}" = "specific" ] && [ -n "${{ github.event.inputs.version }}" ]; then
               VERSION="${{ github.event.inputs.version }}"
@@ -89,35 +91,65 @@ jobs:
             # Fetch base branch
             git fetch origin "$BASE_REF"
             
-            # Check if releases.properties was modified
-            if git diff --name-only "origin/$BASE_REF" HEAD | grep -q "^releases.properties$"; then
-              echo "✅ releases.properties was modified"
+            # PRIMARY METHOD: Check for changed files in /bin directory
+            echo ""
+            echo "🔍 PRIMARY METHOD: Checking for version changes in /bin directory..."
+            
+            # Get changed files in bin directory
+            CHANGED_BIN_FILES=$(git diff --name-only "origin/$BASE_REF" HEAD | grep "^bin/mariadb" || true)
+            
+            if [ -n "$CHANGED_BIN_FILES" ]; then
+              echo "✅ Found changes in /bin directory:"
+              echo "$CHANGED_BIN_FILES"
               
-              # Get added or modified versions
-              CHANGED_VERSIONS=$(git diff "origin/$BASE_REF" HEAD -- releases.properties | \
-                grep "^+" | grep -E "^\\+[0-9]" | cut -d'=' -f1 | cut -c2- | tr -d ' ' | sort -u)
+              # Extract version numbers from directory names (e.g., bin/mariadb11.8.3/ -> 11.8.3)
+              BIN_VERSIONS=$(echo "$CHANGED_BIN_FILES" | \
+                grep -oE "bin/mariadb[0-9]+\.[0-9]+\.[0-9]+" | \
+                sed 's|bin/mariadb||' | \
+                sort -u)
               
-              if [ -n "$CHANGED_VERSIONS" ]; then
-                echo "Changed versions detected:"
-                echo "$CHANGED_VERSIONS"
-                VERSIONS=$(echo "$CHANGED_VERSIONS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-                HAS_CHANGES="true"
-              else
-                echo "No version changes detected in releases.properties"
-                echo "Testing latest 5 versions as fallback"
-                VERSIONS=$(get_latest_versions 5 | jq -R -s -c 'split("\n") | map(select(length > 0))')
-                HAS_CHANGES="true"
+              if [ -n "$BIN_VERSIONS" ]; then
+                echo "📦 Detected versions from /bin directory:"
+                echo "$BIN_VERSIONS"
+                
+                # Verify these versions exist in releases.properties
+                VALID_VERSIONS=""
+                for ver in $BIN_VERSIONS; do
+                  if grep -q "^${ver} =" releases.properties; then
+                    echo "✅ Version $ver found in releases.properties"
+                    VALID_VERSIONS="${VALID_VERSIONS}${ver}\n"
+                  else
+                    echo "⚠️  Version $ver not found in releases.properties (may be a new version)"
+                    # Still include it if the directory exists
+                    if [ -d "bin/mariadb${ver}" ]; then
+                      echo "   Including $ver anyway (directory exists in /bin)"
+                      VALID_VERSIONS="${VALID_VERSIONS}${ver}\n"
+                    fi
+                  fi
+                done
+                
+                if [ -n "$VALID_VERSIONS" ]; then
+                  VERSIONS=$(echo -e "$VALID_VERSIONS" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+                  HAS_CHANGES="true"
+                  DETECTION_METHOD="bin_directory"
+                  echo "✅ Using versions from /bin directory changes"
+                fi
               fi
-            else
-              # Check PR title for version numbers
+            fi
+            
+            # FALLBACK METHOD: Check PR title for version numbers
+            if [ -z "$VERSIONS" ] || [ "$VERSIONS" = "[]" ]; then
+              echo ""
+              echo "🔍 FALLBACK METHOD 2: Checking PR title for version numbers..."
+              
               PR_TITLE="${{ github.event.pull_request.title }}"
-              echo "Checking PR title for version numbers: $PR_TITLE"
+              echo "PR Title: $PR_TITLE"
               
               # Extract version patterns from PR title (e.g., 11.4.8, 10.11.14, 11.1.1-RC)
               PR_VERSIONS=$(echo "$PR_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z]+)?' || true)
               
               if [ -n "$PR_VERSIONS" ]; then
-                echo "Version numbers found in PR title:"
+                echo "📋 Version numbers found in PR title:"
                 echo "$PR_VERSIONS"
                 
                 # Verify these versions exist in releases.properties
@@ -134,26 +166,32 @@ jobs:
                 if [ -n "$VALID_VERSIONS" ]; then
                   VERSIONS=$(echo -e "$VALID_VERSIONS" | sed '/^$/d' | jq -R -s -c 'split("\n") | map(select(length > 0))')
                   HAS_CHANGES="true"
-                else
-                  echo "No valid versions found in PR title"
-                  echo "Testing latest 5 versions as fallback"
-                  VERSIONS=$(get_latest_versions 5 | jq -R -s -c 'split("\n") | map(select(length > 0))')
-                  HAS_CHANGES="true"
+                  DETECTION_METHOD="pr_title"
+                  echo "✅ Using versions from PR title"
                 fi
-              else
-                echo "No version numbers found in PR title"
-                echo "Testing latest 5 versions as fallback"
-                VERSIONS=$(get_latest_versions 5 | jq -R -s -c 'split("\n") | map(select(length > 0))')
-                HAS_CHANGES="true"
               fi
+            fi
+            
+            # FINAL FALLBACK: Test latest 5 versions
+            if [ -z "$VERSIONS" ] || [ "$VERSIONS" = "[]" ]; then
+              echo ""
+              echo "🔍 FINAL FALLBACK: No versions detected, testing latest 5 versions..."
+              VERSIONS=$(get_latest_versions 5 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              HAS_CHANGES="true"
+              DETECTION_METHOD="latest_fallback"
+              echo "✅ Using latest 5 versions as fallback"
             fi
           fi
           
+          echo ""
+          echo "=== Detection Summary ==="
+          echo "Detection Method: $DETECTION_METHOD"
           echo "Versions to test: $VERSIONS"
           echo "Has changes: $HAS_CHANGES"
           
           echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
           echo "has-changes=$HAS_CHANGES" >> $GITHUB_OUTPUT
+          echo "detection-method=$DETECTION_METHOD" >> $GITHUB_OUTPUT
 
   test-mariadb:
     name: Test MariaDB ${{ matrix.version }}
@@ -539,6 +577,7 @@ jobs:
           # Determine overall test status
           TEST_STATUS="${{ needs.test-mariadb.result }}"
           VERSIONS='${{ needs.detect-versions.outputs.versions }}'
+          DETECTION_METHOD="${{ needs.detect-versions.outputs.detection-method }}"
           
           if [ "$TEST_STATUS" = "skipped" ] || [ "$VERSIONS" = "[]" ]; then
             echo "**Status:** ⏭️ Tests skipped - no versions to test" >> comment.md
@@ -546,12 +585,12 @@ jobs:
             echo "ℹ️ **Why were tests skipped?**" >> comment.md
             echo "" >> comment.md
             echo "Tests are only run when:" >> comment.md
-            echo "- \`releases.properties\` is modified with new/updated versions, OR" >> comment.md
+            echo "- Changes are detected in \`/bin\` directory (e.g., \`bin/mariadb11.8.3/\`), OR" >> comment.md
             echo "- PR title contains version numbers (e.g., \"11.4.8\", \"10.11.14\") that exist in \`releases.properties\`" >> comment.md
             echo "" >> comment.md
             echo "**To trigger tests:**" >> comment.md
-            echo "1. Add version numbers to your PR title (e.g., \"Update docs for MariaDB 11.4.8\")" >> comment.md
-            echo "2. Or modify \`releases.properties\` to add/update versions" >> comment.md
+            echo "1. Add/modify version directories in \`/bin\` (e.g., \`bin/mariadb11.8.3/\`)" >> comment.md
+            echo "2. Add version numbers to your PR title (e.g., \"Update MariaDB 11.4.8\")" >> comment.md
             echo "3. Or manually trigger the workflow from the Actions tab" >> comment.md
           elif [ "$TEST_STATUS" = "success" ]; then
             echo "**Status:** ✅ All tests passed" >> comment.md
@@ -562,6 +601,28 @@ jobs:
           fi
           
           echo "" >> comment.md
+          
+          # Show detection method if tests ran
+          if [ "$TEST_STATUS" != "skipped" ] && [ "$VERSIONS" != "[]" ]; then
+            case "$DETECTION_METHOD" in
+              "bin_directory")
+                echo "**Detection Method:** 📦 Detected from \`/bin\` directory changes" >> comment.md
+                ;;
+              "releases_properties")
+                echo "**Detection Method:** 📝 Detected from \`releases.properties\` changes" >> comment.md
+                ;;
+              "pr_title")
+                echo "**Detection Method:** 📋 Extracted from PR title" >> comment.md
+                ;;
+              "latest_fallback")
+                echo "**Detection Method:** 🔄 Testing latest 5 versions (fallback)" >> comment.md
+                ;;
+              "manual")
+                echo "**Detection Method:** 🖱️ Manual workflow dispatch" >> comment.md
+                ;;
+            esac
+            echo "" >> comment.md
+          fi
           
           # Generate badges for each version
           if [ "$TEST_STATUS" != "skipped" ] && [ "$VERSIONS" != "[]" ]; then

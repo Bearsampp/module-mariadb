@@ -14,14 +14,31 @@ The MariaDB testing workflow is triggered automatically on:
 
 ## Test Scope
 
-The workflow intelligently determines which versions to test based on the context:
+The workflow intelligently determines which versions to test based on the context using a **2-tier smart detection system**:
 
-### Pull Request Testing
-- **Smart Detection**: Automatically detects which MariaDB versions were added or modified in the PR
-- **Targeted Testing**: Only tests the versions that changed in `releases.properties`
-- **Efficiency**: Reduces CI runtime by testing only relevant versions
-- **Fallback**: If no version changes detected, tests the latest 5 versions
-- **Comprehensive**: Tests all versions including RC (Release Candidate), beta, and alpha versions
+### Pull Request Testing - Smart Detection
+
+The workflow uses a cascading detection strategy to identify which versions to test:
+
+#### 🔍 PRIMARY METHOD: /bin Directory Detection
+- **Automatically detects** which MariaDB versions are included in the PR from changed files in `/bin` directory
+- **Extracts version numbers** from directory names (e.g., `bin/mariadb11.8.3/` → `11.8.3`)
+- **Validates versions** against `releases.properties` for consistency
+- **Includes new versions** even if not yet in `releases.properties` (if directory exists in `/bin`)
+- **Most efficient**: Tests only the versions you're actually adding/modifying
+
+#### 📋 FALLBACK METHOD: PR Title Extraction
+- **Activates when**: No changes detected in `/bin` directory
+- **Extracts version numbers** from PR title (e.g., "Update MariaDB 11.4.8")
+- **Supports formats**: `11.4.8`, `10.11.14`, `11.1.1-RC`
+- **Validates versions** exist in `releases.properties`
+- **Useful for**: Documentation updates or non-code changes that reference specific versions
+
+#### 🔄 FINAL FALLBACK: Latest 5 Versions
+- **Activates when**: No versions detected by either of the above methods
+- **Tests latest 5 versions** from `releases.properties`
+- **Ensures coverage**: Prevents PRs from skipping tests entirely
+- **Safety net**: Catches potential regressions in recent versions
 
 ### Manual Testing
 - **Latest 5 Versions**: Tests the 5 most recent versions from `releases.properties`
@@ -29,10 +46,40 @@ The workflow intelligently determines which versions to test based on the contex
 - **Flexibility**: Useful for re-testing or validating specific versions
 
 ### Example Scenarios
-- **Add MariaDB 11.4.8**: Only version 11.4.8 is tested
-- **Add versions 10.11.14 and 11.4.8**: Both versions are tested
-- **Modify existing version URL**: That specific version is tested
-- **Non-version changes**: Latest 5 versions tested as fallback
+
+#### Scenario 1: Pre-release Workflow (Most Common)
+```
+1. New versions created and added to pre-release (tagged with date, e.g., "2025.11.23")
+2. Version directories created in /bin (e.g., bin/mariadb11.8.3/, bin/mariadb12.0.2/)
+3. releases.properties updated via workflow
+4. PR created from release branch (e.g., "November") to main
+5. ✅ Workflow detects: bin/mariadb11.8.3/ and bin/mariadb12.0.2/
+6. Tests run against: 11.8.3 and 12.0.2 only
+```
+
+#### Scenario 2: Documentation Update with Version Reference
+```
+1. Update README.md mentioning "MariaDB 11.4.8"
+2. Create PR with title: "Update docs for MariaDB 11.4.8"
+3. ✅ Workflow detects: Version 11.4.8 in PR title
+4. Tests run against: 11.4.8 only
+```
+
+#### Scenario 3: General Changes (Fallback)
+```
+1. Update build scripts or CI configuration
+2. Create PR to main
+3. ✅ Workflow detects: No specific versions
+4. Tests run against: Latest 5 versions (safety check)
+```
+
+### Detection Method Reporting
+
+The workflow reports which detection method was used in PR comments:
+- 📦 **Detected from `/bin` directory changes** - Primary method
+- 📋 **Extracted from PR title** - Fallback method
+- 🔄 **Testing latest 5 versions (fallback)** - Final fallback
+- 🖱️ **Manual workflow dispatch** - Manual trigger
 
 ## Test Phases
 

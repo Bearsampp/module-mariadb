@@ -7,6 +7,10 @@ This directory contains documentation for the Bearsampp MariaDB module.
 ### [CI/CD Testing](CI-CD-TESTING.md)
 
 Comprehensive guide to the automated testing workflow for MariaDB builds:
+- **Smart Version Detection**: 2-tier cascading detection system
+  - Primary: `/bin` directory changes detection
+  - Fallback: PR title version extraction
+  - Final Fallback: Latest 5 versions
 - Workflow triggers and configuration
 - Detailed test phase descriptions
 - Test results and artifacts

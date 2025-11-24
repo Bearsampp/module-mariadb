@@ -55,11 +55,26 @@ gradle clean
 
 For complete documentation, see [.gradle-docs/README.md](.gradle-docs/README.md)
 
+## CI/CD Testing
+
+This module includes automated testing for all MariaDB versions using GitHub Actions:
+
+- **Smart Version Detection**: Automatically detects which versions to test from PR changes
+  - 📦 Primary: Detects versions from `/bin` directory changes (e.g., `bin/mariadb11.8.3/`)
+  - 📋 Fallback: Extracts versions from PR title
+  - 🔄 Final Fallback: Tests latest 5 versions if no versions detected
+- **Efficient Testing**: Only tests relevant versions, reducing CI runtime
+- **Comprehensive Validation**: Tests download, extraction, and executable functionality
+- **Automated PR Comments**: Results posted directly to pull requests
+
+For detailed information about the testing workflow, see [docs/CI-CD-TESTING.md](docs/CI-CD-TESTING.md)
+
 ## Documentation
 
 - **Build Documentation**: [.gradle-docs/README.md](.gradle-docs/README.md)
 - **Task Reference**: [.gradle-docs/TASKS.md](.gradle-docs/TASKS.md)
 - **Configuration Guide**: [.gradle-docs/CONFIGURATION.md](.gradle-docs/CONFIGURATION.md)
+- **CI/CD Testing**: [docs/CI-CD-TESTING.md](docs/CI-CD-TESTING.md)
 - **Module Downloads**: https://bearsampp.com/module/mariadb
 
 ## Issues
