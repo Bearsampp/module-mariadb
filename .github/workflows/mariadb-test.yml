@@ -32,6 +32,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Get MariaDB Versions
@@ -212,22 +213,33 @@ jobs:
           New-Item -ItemType Directory -Force -Path "test-mariadb"
           New-Item -ItemType Directory -Force -Path "test-results"
 
+      - name: Checkout main branch for releases.properties
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: |
+            releases.properties
+          sparse-checkout-cone-mode: false
+          path: main-branch
+
       - name: Phase 1.1 - Download and Extract MariaDB
         id: download-mariadb
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           $ErrorActionPreference = "Stop"
           $version = "${{ matrix.version }}"
           
           Write-Host "=== Phase 1.1: Download and Extract MariaDB $version ==="
           
-          # Read releases.properties
-          $releasesFile = "releases.properties"
+          # Read releases.properties from main branch
+          $releasesFile = "main-branch/releases.properties"
           
           if (-not (Test-Path $releasesFile)) {
-            Write-Host "❌ ERROR: releases.properties not found"
+            Write-Host "❌ ERROR: releases.properties not found in main branch"
             echo "success=false" >> $env:GITHUB_OUTPUT
-            echo "error=releases.properties file not found" >> $env:GITHUB_OUTPUT
+            echo "error=releases.properties file not found in main branch" >> $env:GITHUB_OUTPUT
             exit 1
           }
           
@@ -258,8 +270,20 @@ jobs:
             Write-Host "Downloading MariaDB $version..."
             Write-Host "Target file: $downloadPath"
             
+            # Set up headers for GitHub API if using GH_PAT
+            $headers = @{}
+            if ($env:GH_TOKEN) {
+              Write-Host "Using GitHub token for authentication"
+              $headers["Authorization"] = "token $env:GH_TOKEN"
+              $headers["Accept"] = "application/octet-stream"
+            }
+            
             try {
-              Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath -UseBasicParsing -TimeoutSec 300
+              if ($headers.Count -gt 0) {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath -Headers $headers -UseBasicParsing -TimeoutSec 300
+              } else {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath -UseBasicParsing -TimeoutSec 300
+              }
             } catch {
               Write-Host "❌ ERROR: Download failed!"
               Write-Host "Error details: $($_.Exception.Message)"
