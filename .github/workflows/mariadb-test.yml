@@ -702,14 +702,17 @@ jobs:
                 # Check if tests passed by looking for "ALL TESTS PASSED" in summary
                 if grep -q "ALL TESTS PASSED" "$SUMMARY_FILE"; then
                   # Success badge (green)
-                  echo "![MariaDB ${version}](https://img.shields.io/badge/MariaDB_${version}-PASS-success?style=flat-square&logo=mariadb&logoColor=white)" >> comment.md
+                  BADGE_VERSION=$(echo "$version" | sed 's/-/--/g')
+                  echo "![MariaDB ${version}](https://img.shields.io/badge/MariaDB_${BADGE_VERSION}-PASS-success?style=flat-square&logo=mariadb&logoColor=white)" >> comment.md
                 else
                   # Failure badge (red)
-                  echo "![MariaDB ${version}](https://img.shields.io/badge/MariaDB_${version}-FAIL-critical?style=flat-square&logo=mariadb&logoColor=white)" >> comment.md
+                  BADGE_VERSION=$(echo "$version" | sed 's/-/--/g')
+                  echo "![MariaDB ${version}](https://img.shields.io/badge/MariaDB_${BADGE_VERSION}-FAIL-critical?style=flat-square&logo=mariadb&logoColor=white)" >> comment.md
                 fi
               else
                 # No results badge (gray)
-                echo "![MariaDB ${version}](https://img.shields.io/badge/MariaDB_${version}-NO_RESULTS-inactive?style=flat-square&logo=mariadb&logoColor=white)" >> comment.md
+                BADGE_VERSION=$(echo "$version" | sed 's/-/--/g')
+                echo "![MariaDB ${version}](https://img.shields.io/badge/MariaDB_${BADGE_VERSION}-NO_RESULTS-inactive?style=flat-square&logo=mariadb&logoColor=white)" >> comment.md
               fi
             done
             
