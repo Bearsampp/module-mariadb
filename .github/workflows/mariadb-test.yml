@@ -30,7 +30,7 @@ jobs:
       has-changes: ${{ steps.get-versions.outputs.has-changes }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -205,7 +205,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Create test directory
         run: |
@@ -213,7 +213,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "test-results"
 
       - name: Checkout main branch for releases.properties (fallback)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: main
           sparse-checkout: |
