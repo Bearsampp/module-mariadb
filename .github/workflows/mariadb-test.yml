@@ -32,7 +32,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: main
           fetch-depth: 0
 
       - name: Get MariaDB Versions
@@ -103,9 +102,9 @@ jobs:
               echo "✅ Found changes in /bin directory:"
               echo "$CHANGED_BIN_FILES"
               
-              # Extract version numbers from directory names (e.g., bin/mariadb11.8.3/ -> 11.8.3, bin/mariadb11.1.1-RC/ -> 11.1.1-RC)
+              # Extract version numbers from directory names (e.g., bin/mariadb11.8.3/ -> 11.8.3, bin/mariadb13.0.1-RC/ -> 13.0.1-RC)
               BIN_VERSIONS=$(echo "$CHANGED_BIN_FILES" | \
-                grep -oE "bin/mariadb[0-9]+\.[0-9]+\.[0-9]+(-(RC|rc|beta|alpha|dev)[0-9]*)?" | \
+                grep -oE "bin/mariadb[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z]+)?" | \
                 sed 's|bin/mariadb||' | \
                 sort -u)
               
@@ -213,7 +212,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "test-mariadb"
           New-Item -ItemType Directory -Force -Path "test-results"
 
-      - name: Checkout main branch for releases.properties
+      - name: Checkout main branch for releases.properties (fallback)
         uses: actions/checkout@v4
         with:
           ref: main
@@ -233,15 +232,56 @@ jobs:
           
           Write-Host "=== Phase 1.1: Download and Extract MariaDB $version ==="
           
-          # Read releases.properties from main branch
-          $releasesFile = "main-branch/releases.properties"
+          # First, try to find version in the PR branch's releases.properties (root checkout)
+          $prReleasesFile = "releases.properties"
+          $mainReleasesFile = "main-branch/releases.properties"
+          $releasesFile = $null
+          $releasesSource = ""
           
-          if (-not (Test-Path $releasesFile)) {
-            Write-Host "❌ ERROR: releases.properties not found in main branch"
+          # Check PR branch's releases.properties first
+          if (Test-Path $prReleasesFile) {
+            $found = $false
+            Get-Content $prReleasesFile | ForEach-Object {
+              $line = $_.Trim()
+              if ($line -match "^$([regex]::Escape($version))\s*=\s*(.+)$") {
+                $found = $true
+              }
+            }
+            if ($found) {
+              $releasesFile = $prReleasesFile
+              $releasesSource = "PR branch"
+              Write-Host "Using releases.properties from PR branch"
+            }
+          }
+          
+          # Fall back to main branch's releases.properties
+          if (-not $releasesFile -and (Test-Path $mainReleasesFile)) {
+            $found = $false
+            Get-Content $mainReleasesFile | ForEach-Object {
+              $line = $_.Trim()
+              if ($line -match "^$([regex]::Escape($version))\s*=\s*(.+)$") {
+                $found = $true
+              }
+            }
+            if ($found) {
+              $releasesFile = $mainReleasesFile
+              $releasesSource = "main branch"
+              Write-Host "Using releases.properties from main branch (fallback)"
+            }
+          }
+          
+          if (-not $releasesFile) {
+            Write-Host "❌ ERROR: Version $version not found in any releases.properties"
+            Write-Host "Available versions in PR releases.properties:"
+            if (Test-Path $prReleasesFile) {
+              Get-Content $prReleasesFile | Select-String "^[0-9]" | ForEach-Object { Write-Host "  - $($_.Line.Split('=')[0].Trim())" }
+            }
             echo "success=false" >> $env:GITHUB_OUTPUT
-            echo "error=releases.properties file not found in main branch" >> $env:GITHUB_OUTPUT
+            echo "error=Version $version not found in releases.properties" >> $env:GITHUB_OUTPUT
             exit 1
           }
+          
+          Write-Host "Found version $version in $releasesSource releases.properties"
           
           # Parse releases.properties to get download URL
           $downloadUrl = $null
@@ -254,8 +294,6 @@ jobs:
           
           if (-not $downloadUrl) {
             Write-Host "❌ ERROR: Version $version not found in releases.properties"
-            Write-Host "Available versions in releases.properties:"
-            Get-Content $releasesFile | Select-String "^[0-9]" | ForEach-Object { Write-Host "  - $($_.Line.Split('=')[0].Trim())" }
             echo "success=false" >> $env:GITHUB_OUTPUT
             echo "error=Version $version not found in releases.properties" >> $env:GITHUB_OUTPUT
             exit 1
