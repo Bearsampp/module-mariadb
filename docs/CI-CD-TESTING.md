@@ -382,10 +382,13 @@ To manually test a specific version:
 MariaDB versions in `releases.properties` should follow these patterns:
 
 - **Major.Minor.Patch**: `11.4.8`, `10.11.14`, `10.6.23`
-- **Release Candidates**: `11.1.1-RC`, `11.2.1-RC`
+- **Release Candidates**: `11.1.1-RC`, `11.2.1-RC`, `13.0.1-RC`
+- **Pre-release suffixes**: The workflow also recognizes `-rc`, `-beta`, `-alpha`, and `-dev` suffixes, optionally followed by a number (e.g., `12.1.2-beta1`)
 - **Legacy versions**: `10.3.37`, `10.4.27`
 
 The workflow supports all version formats and will test them accordingly.
+
+When detecting changes via the `/bin` directory, the full version string including any suffix is used for both the `releases.properties` lookup and the directory existence check, so a PR adding `bin/mariadb13.0.1-RC/` is detected as version `13.0.1-RC`.
 
 ## Workflow Outputs
 
