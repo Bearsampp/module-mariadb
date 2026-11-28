@@ -3,12 +3,12 @@
   "owner": "Bearsampp",
   "repo": "module-mariadb",
   "visibility": "public",
-  "generatedAt": "2026-11-27T06:22:37.102Z",
+  "generatedAt": "2026-11-28T05:58:43.055Z",
   "stats": {
-    "total": 13131,
-    "day": 0,
-    "week": 932,
-    "month": 4337
+    "total": 13132,
+    "day": 1,
+    "week": 641,
+    "month": 3584
   },
   "partial": {
     "day": false,
@@ -17,9 +17,9 @@
   },
   "snapshots": {
     "windowDays": 180,
-    "count": 51,
+    "count": 52,
     "firstDate": "2026-10-07",
-    "lastDate": "2026-11-27",
+    "lastDate": "2026-11-28",
     "series": {
       "2026-10-07": 6927,
       "2026-10-08": 6934,
@@ -71,7 +71,8 @@
       "2026-11-24": 13082,
       "2026-11-25": 13098,
       "2026-11-26": 13131,
-      "2026-11-27": 13131
+      "2026-11-27": 13131,
+      "2026-11-28": 13132
     }
   },
   "profile": {
